@@ -1,0 +1,103 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id        String    @id @default(uuid())
+  email     String    @unique
+  name      String
+  avatarUrl String?
+  status    UserStatus @default(OFFLINE)
+  role      UserRole   @default(USER)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  // Relations
+  messages        Message[]
+  channelMembers  ChannelMember[]
+  files          File[]
+}
+
+model Channel {
+  id          String    @id @default(uuid())
+  name        String    @unique
+  description String?
+  isPrivate   Boolean   @default(false)
+  createdById String
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  messages        Message[]
+  channelMembers  ChannelMember[]
+}
+
+model ChannelMember {
+  id            String    @id @default(uuid())
+  channelId     String
+  userId        String
+  roleInChannel ChannelRole @default(MEMBER)
+  joinedAt      DateTime    @default(now())
+
+  // Relations
+  channel       Channel     @relation(fields: [channelId], references: [id])
+  user          User        @relation(fields: [userId], references: [id])
+
+  @@unique([channelId, userId])
+}
+
+model Message {
+  id        String    @id @default(uuid())
+  content   String
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  channelId String
+  userId    String
+  parentId  String?
+
+  // Relations
+  channel   Channel   @relation(fields: [channelId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+  parent    Message?  @relation("ThreadReplies", fields: [parentId], references: [id])
+  replies   Message[] @relation("ThreadReplies")
+  files     File[]
+}
+
+model File {
+  id        String    @id @default(uuid())
+  url       String
+  messageId String
+  userId    String
+  uploadedAt DateTime @default(now())
+
+  // Relations
+  message   Message   @relation(fields: [messageId], references: [id])
+  user      User      @relation(fields: [userId], references: [id])
+}
+
+enum UserStatus {
+  ONLINE
+  OFFLINE
+  AWAY
+}
+
+enum UserRole {
+  ADMIN
+  USER
+}
+
+enum ChannelRole {
+  ADMIN
+  MEMBER
+}

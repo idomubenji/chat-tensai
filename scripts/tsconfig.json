@@ -1,0 +1,18 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "module": "CommonJS",
+    "moduleResolution": "node",
+    "baseUrl": "../",
+    "paths": {
+      "@/*": ["./*"]
+    },
+    "lib": ["ES2015"],
+    "types": ["node"],
+    "esModuleInterop": true
+  },
+  "include": ["./**/*"],
+  "ts-node": {
+    "transpileOnly": true
+  }
+}

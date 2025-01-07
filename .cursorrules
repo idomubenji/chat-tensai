@@ -1,0 +1,27 @@
+{
+  "languageSpecificRules": {
+    "typescript": {
+      "strictTyping": true,
+      "quotes": "single",
+      "semi": true,
+      "indentation": "2 spaces",
+      "variableNaming": "camelCase",
+      "functionNaming": "camelCase"
+    }
+  },
+  "generalRules": {
+    "documentation": {
+      "referencePRD": "docs/chat-genius-prd.md",
+      "style": "Use concise and clear descriptions for functions and components.",
+      "requireDocstrings": true
+    },
+    "commentStyle": "Explain intent and reasoning.",
+    "errorHandling": "Include explicit error types in try-catch blocks."
+  },
+  "taskSpecificRules": {
+    "codeGeneration": {
+      "usePRD": true,
+      "instruction": "Always consult the PRD at 'docs/chat-genius-prd.md' for context when generating or modifying code. Ensure features match the described requirements. Let me know if you see an issue with this code before proceeding."
+    }
+  }
+}
