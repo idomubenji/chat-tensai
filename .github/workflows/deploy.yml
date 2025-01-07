@@ -1,0 +1,83 @@
+name: Deploy to EC2
+
+on:
+  push:
+    branches: [ "main" ]
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPOSITORY: chat-genius
+  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  deploy:
+    name: Deploy
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v3
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: arn:aws:iam::474668398195:role/UnifiedServicesRole
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Test AWS Connection
+      run: |
+        echo "Testing AWS Connection..."
+        aws sts get-caller-identity
+        echo "Testing SSM access..."
+        aws ssm describe-instance-information --region us-east-1
+
+    - name: Add Parameters to SSM
+      run: |
+        aws ssm put-parameter --name "/chat-genius/DATABASE_URL" --value "${{ secrets.DATABASE_URL }}" --type "SecureString" --overwrite
+        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" --value "${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" --type "SecureString" --overwrite
+        aws ssm put-parameter --name "/chat-genius/CLERK_SECRET_KEY" --value "${{ secrets.CLERK_SECRET_KEY }}" --type "SecureString" --overwrite
+        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_SUPABASE_URL" --value "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" --type "SecureString" --overwrite
+        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_SUPABASE_ANON_KEY" --value "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" --type "SecureString" --overwrite
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Build, tag, and push image to Amazon ECR
+      id: build-image
+      env:
+        ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        IMAGE_TAG: ${{ github.sha }}
+      run: |
+        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+        docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
+        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+    - name: Deploy to EC2
+      run: |
+        echo "Deploying to instance ${{ env.EC2_INSTANCE_ID }}..."
+        aws ssm send-command \
+          --document-name "AWS-RunShellScript" \
+          --targets "Key=instanceids,Values=${{ env.EC2_INSTANCE_ID }}" \
+          --parameters 'commands=[
+            "aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin 474668398195.dkr.ecr.us-east-1.amazonaws.com",
+            "docker pull 474668398195.dkr.ecr.us-east-1.amazonaws.com/chat-genius:latest",
+            "docker stop chat-genius || true",
+            "docker rm chat-genius || true",
+            "docker run -d --name chat-genius -p 80:3000 \
+              -e NODE_ENV=production \
+              -e AWS_REGION=us-east-1 \
+              -e DATABASE_URL=\"$(aws ssm get-parameter --name /chat-genius/DATABASE_URL --with-decryption --query Parameter.Value --output text)\" \
+              -e NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY=\"$(aws ssm get-parameter --name /chat-genius/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY --with-decryption --query Parameter.Value --output text)\" \
+              -e CLERK_SECRET_KEY=\"$(aws ssm get-parameter --name /chat-genius/CLERK_SECRET_KEY --with-decryption --query Parameter.Value --output text)\" \
+              -e NEXT_PUBLIC_SUPABASE_URL=\"$(aws ssm get-parameter --name /chat-genius/NEXT_PUBLIC_SUPABASE_URL --with-decryption --query Parameter.Value --output text)\" \
+              -e NEXT_PUBLIC_SUPABASE_ANON_KEY=\"$(aws ssm get-parameter --name /chat-genius/NEXT_PUBLIC_SUPABASE_ANON_KEY --with-decryption --query Parameter.Value --output text)\" \
+              474668398195.dkr.ecr.us-east-1.amazonaws.com/chat-genius:latest"
+          ]' 
