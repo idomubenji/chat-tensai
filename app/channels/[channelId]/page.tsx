@@ -115,11 +115,6 @@ export default function ChannelPage({
     }
   };
 
-  // Show loading state while checking auth
-  if (!isLoaded || loading) {
-    return <div>Loading...</div>;
-  }
-
   // Return null while redirecting to sign-in
   if (!userId) {
     return null;
@@ -145,6 +140,7 @@ export default function ChannelPage({
             onMessageUpdate={handleMessageUpdate}
             selectedMessage={selectedMessage}
             onSelectMessage={setSelectedMessage}
+            isLoading={!isLoaded || loading}
           />
         </div>
       </div>

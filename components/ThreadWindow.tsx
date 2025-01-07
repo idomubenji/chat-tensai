@@ -4,12 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Send, X } from "lucide-react";
 import { MessageReactions } from "./MessageReactions";
 import { cn } from "@/lib/utils";
+import { UserName } from "./UserName";
 
 type Message = {
   id: string;
   content: string;
   userId: string;
   userName: string;
+  userRole?: string;
   createdAt: string;
   reactions: {
     [key: string]: {
@@ -108,7 +110,11 @@ export function ThreadWindow({
               <span className="text-xs text-gray-600">
                 {new Date(message.createdAt).toLocaleTimeString()}
               </span>
-              <span className="font-semibold text-sm text-gray-800">{message.userName}</span>
+              <UserName
+                name={message.userName}
+                userId={message.userId}
+                role={message.userRole}
+              />
             </div>
             <div className="flex items-start gap-2">
               {isCurrentUser && (

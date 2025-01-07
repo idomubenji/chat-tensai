@@ -1,36 +1,29 @@
-import { withClerkMiddleware, getAuth } from "@clerk/nextjs/server";
-import { NextResponse } from "next/server";
-import type { NextRequest } from "next/server";
+import { authMiddleware } from '@clerk/nextjs';
+import { createMiddlewareClient } from '@supabase/auth-helpers-nextjs';
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 
-// Set the paths that don't require authentication
-const publicPaths = ["/", "/sign-in*", "/sign-up*"];
+const middleware = async (req: NextRequest) => {
+  const res = NextResponse.next();
+  
+  // Create Supabase client with middleware config
+  const supabase = createMiddlewareClient({ req, res });
 
-const isPublic = (path: string) => {
-  return publicPaths.find(x => 
-    path.match(new RegExp(`^${x}$`.replace('*$', '($|/)')))
-  );
-}
+  // Refresh session if expired - required for Server Components
+  await supabase.auth.getSession();
 
-export default withClerkMiddleware((req: NextRequest) => {
-  const { userId } = getAuth(req);
-  const path = req.nextUrl.pathname;
+  return res;
+};
 
-  if (!isPublic(path) && !userId) {
-    const signInUrl = new URL('/sign-in', req.url);
-    signInUrl.searchParams.set('redirect_url', req.url);
-    return NextResponse.redirect(signInUrl);
-  }
-  return NextResponse.next();
+// Use Clerk's auth middleware and then our Supabase middleware
+export default authMiddleware({
+  afterAuth: (auth, req, evt) => {
+    // Handle the middleware function after Clerk auth
+    return middleware(req);
+  },
+  publicRoutes: ['/'], // Add your public routes here
 });
 
 export const config = {
-  matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     */
-    "/((?!_next/static|_next/image|favicon.ico).*)",
-  ],
+  matcher: ['/((?!.+\\.[\\w]+$|_next).*)', '/', '/(api|trpc)(.*)'],
 };

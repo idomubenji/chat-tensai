@@ -11,6 +11,7 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL") // Used for migrations
 }
 
 model User {
@@ -27,6 +28,7 @@ model User {
   messages        Message[]
   channelMembers  ChannelMember[]
   files          File[]
+  reactions      MessageReaction[]
 }
 
 model Channel {
@@ -72,6 +74,20 @@ model Message {
   parent    Message?  @relation("ThreadReplies", fields: [parentId], references: [id])
   replies   Message[] @relation("ThreadReplies")
   files     File[]
+  reactions MessageReaction[]
+}
+
+model MessageReaction {
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+
+  // Relations
+  message   Message  @relation(fields: [messageId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
+
+  @@id([messageId, userId, emoji])
 }
 
 model File {

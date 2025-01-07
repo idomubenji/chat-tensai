@@ -5,6 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { LoadingBall } from "@/components/ui/loading";
 
 export default function SettingsPage() {
   const { isLoaded, userId } = useAuth();
@@ -18,7 +19,7 @@ export default function SettingsPage() {
 
   // Show loading state while checking auth
   if (!isLoaded) {
-    return <div>Loading...</div>;
+    return <LoadingBall />;
   }
 
   // Return null while redirecting to sign-in

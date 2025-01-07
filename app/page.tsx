@@ -4,6 +4,7 @@ import { useEffect } from "react";
 import { TopBar } from "@/components/TopBar";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
+import { LoadingBall } from "@/components/ui/loading";
 
 export default function Home() {
   const { isLoaded, userId } = useAuth();
@@ -17,7 +18,7 @@ export default function Home() {
 
   // Show loading state while checking auth
   if (!isLoaded) {
-    return <div>Loading...</div>;
+    return <LoadingBall />;
   }
 
   // Only show the main content if user is authenticated

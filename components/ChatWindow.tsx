@@ -7,12 +7,15 @@ import { cn } from "@/lib/utils";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyButton } from "./MessageReplyButton";
 import { ThreadWindow } from "./ThreadWindow";
+import { LoadingBall } from "./LoadingBall";
+import { UserName } from "./UserName";
 
 type Message = {
   id: string;
   content: string;
   userId: string;
   userName: string;
+  userRole?: string;
   createdAt: string;
   reactions: {
     [key: string]: {
@@ -31,6 +34,7 @@ interface ChatWindowProps {
   onMessageUpdate?: (messageId: string, updates: Partial<Message>) => void;
   selectedMessage: Message | null;
   onSelectMessage: (message: Message | null) => void;
+  isLoading?: boolean;
 }
 
 export function ChatWindow({
@@ -41,10 +45,22 @@ export function ChatWindow({
   onMessageUpdate,
   selectedMessage,
   onSelectMessage,
+  isLoading = false,
 }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState("");
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { userId } = useAuth();
+
+  useEffect(() => {
+    if (isLoading) {
+      setIsTransitioning(false);
+    } else {
+      setIsTransitioning(true);
+      const timer = setTimeout(() => setIsTransitioning(false), 500); // Match fade-out duration
+      return () => clearTimeout(timer);
+    }
+  }, [isLoading]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -127,6 +143,20 @@ export function ChatWindow({
     }
   };
 
+  if (isLoading || isTransitioning) {
+    return (
+      <div className="flex items-center justify-center h-full bg-[#F5E6D3]">
+        <div className={cn(
+          "w-12 h-12 rounded-full",
+          "bg-gradient-to-r from-yellow-300 to-purple-500",
+          "shadow-[0_0_20px_rgba(252,211,77,0.7)]",
+          "animate-glow",
+          isTransitioning ? "animate-fade-out" : "animate-fade-in"
+        )} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col h-full bg-[#F5E6D3]">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
@@ -148,7 +178,11 @@ export function ChatWindow({
                     <span className="text-xs text-gray-600">
                       {new Date(message.createdAt).toLocaleTimeString()}
                     </span>
-                    <span className="font-semibold text-sm text-gray-800">{message.userName}</span>
+                    <UserName
+                      name={message.userName}
+                      userId={message.userId}
+                      role={message.userRole}
+                    />
                   </div>
                   <div className="flex items-start gap-2">
                     {isCurrentUser && (

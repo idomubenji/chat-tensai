@@ -191,6 +191,26 @@ Our Slack Clone is a real-time messaging platform for teams, supporting channels
 4. **Message**: `id`, `content`, `created_at`, `updated_at`, `channel_id`, `user_id`, `parent_id`.
 5. **File**: `id`, `url`, `uploaded_by`, `message_id`, `uploaded_at`.
 
+#### **File Storage with AWS S3**
+
+1. **S3 Bucket Structure**:
+   - `/uploads/[user_id]/[file_id]` - User-specific file uploads
+   - `/avatars/[user_id]` - User avatar images
+   - `/public/[file_id]` - Publicly accessible files
+
+2. **File Management**:
+   - Secure pre-signed URLs for file uploads
+   - Automatic file type validation and virus scanning
+   - Configurable file size limits and quotas per user
+   - Automatic cleanup of orphaned files
+   - Image optimization for previews and thumbnails
+
+3. **Security**:
+   - Private bucket with restricted access
+   - Temporary pre-signed URLs for file access
+   - Server-side encryption for stored files
+   - CORS configuration for direct browser uploads
+
 #### **API Endpoints**
 
 1. `GET /api/users/me` - Fetch authenticated user data.
@@ -206,6 +226,42 @@ Our Slack Clone is a real-time messaging platform for teams, supporting channels
 3. **ChannelView**: Shows channel messages, threads, and files.
 4. **MessageInput**: Handles message composition and file uploads.
 5. **AdminTools**: Manages channels and user permissions.
+
+---
+
+### **Deployment Architecture**
+
+#### **Amazon ECS Infrastructure**
+
+1. **Container Architecture**:
+   - Application containers running on ECS Fargate
+   - Auto-scaling based on CPU and memory metrics
+   - Load balancing across multiple availability zones
+   - Health checks and automatic container recovery
+
+2. **Service Components**:
+   - Web application containers
+   - WebSocket service for real-time communication
+   - Background workers for file processing
+   - Scheduled tasks for maintenance
+
+3. **Networking**:
+   - Application Load Balancer for HTTP/HTTPS traffic
+   - VPC configuration with public and private subnets
+   - Security groups for container access control
+   - CloudFront CDN for static assets and file delivery
+
+4. **Monitoring and Logging**:
+   - CloudWatch for container logs and metrics
+   - X-Ray for distributed tracing
+   - Container Insights for performance monitoring
+   - Automated alerts for service health
+
+5. **CI/CD Pipeline**:
+   - GitHub Actions for automated builds
+   - ECR for container image storage
+   - Blue/green deployments for zero downtime
+   - Automated rollback capabilities
 
 ---
 
