@@ -1,5 +1,5 @@
 import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, act } from '@testing-library/react';
 import { ThreadWindow } from '@/components/ThreadWindow';
 import '@testing-library/jest-dom';
 
@@ -80,7 +80,7 @@ describe('ThreadWindow', () => {
     expect(mockOnClose).toHaveBeenCalled();
   });
 
-  it('allows sending replies', () => {
+  it('allows sending replies', async () => {
     render(
       <ThreadWindow
         parentMessage={mockParentMessage}
@@ -94,8 +94,11 @@ describe('ThreadWindow', () => {
 
     const input = screen.getByPlaceholderText('Reply in thread...');
     fireEvent.change(input, { target: { value: 'New reply' } });
+    
     const form = input.closest('form');
-    fireEvent.submit(form!);
+    await act(async () => {
+      fireEvent.submit(form!);
+    });
 
     expect(mockOnSendReply).toHaveBeenCalledWith('New reply');
   });

@@ -189,6 +189,7 @@ export function ThreadWindow({
             setReplyingTo(null);
           }}
           className="hover:bg-[#334455] text-white"
+          aria-label="Close thread"
         >
           <X className="h-5 w-5" />
         </Button>
