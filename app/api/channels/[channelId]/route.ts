@@ -1,64 +1,63 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
 
-const updateChannelSchema = z.object({
-  name: z.string().min(1).max(50).optional(),
-  description: z.string().max(200).optional(),
-  isPrivate: z.boolean().optional(),
-});
-
-async function isChannelAdmin(userId: string, channelId: string) {
-  const membership = await prisma.channelMember.findUnique({
-    where: {
-      channelId_userId: {
-        channelId,
-        userId,
-      },
-    },
-    select: { roleInChannel: true },
-  });
-
-  return membership?.roleInChannel === 'ADMIN';
-}
-
-export async function PUT(
+export async function PATCH(
   req: Request,
   { params }: { params: { channelId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user is channel admin
-    if (!(await isChannelAdmin(userId, params.channelId))) {
-      return new NextResponse('Forbidden - Admin access required', { status: 403 });
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const json = await req.json();
-    const body = updateChannelSchema.parse(json);
+    const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    const channel = await prisma.channel.update({
-      where: { id: params.channelId },
-      data: {
-        name: body.name,
-        description: body.description,
-        isPrivate: body.isPrivate,
-      },
-    });
+    // Check if user is a member of the channel
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select('role')
+      .eq('channel_id', params.channelId)
+      .eq('user_id', userId)
+      .single();
+
+    if (membershipError) {
+      return new NextResponse('Channel not found', { status: 404 });
+    }
+
+    if (membership.role !== 'ADMIN') {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
+    const body = await req.json();
+    const { name, description, is_private } = body;
+
+    if (!name?.trim()) {
+      return new NextResponse('Channel name is required', { status: 400 });
+    }
+
+    // Update channel
+    const { data: channel, error: updateError } = await supabase
+      .from('channels')
+      .update({
+        name,
+        description,
+        is_private,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.channelId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     return NextResponse.json(channel);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return new NextResponse('Invalid request data', { status: 422 });
-    }
-
-    console.error('[CHANNEL_UPDATE]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error updating channel:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
@@ -66,26 +65,41 @@ export async function DELETE(
   req: Request,
   { params }: { params: { channelId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user is channel admin
-    if (!(await isChannelAdmin(userId, params.channelId))) {
-      return new NextResponse('Forbidden - Admin access required', { status: 403 });
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Delete channel and all related data
-    await prisma.channel.delete({
-      where: { id: params.channelId },
-    });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    // Check if user is an admin of the channel
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select('role')
+      .eq('channel_id', params.channelId)
+      .eq('user_id', userId)
+      .single();
+
+    if (membershipError) {
+      return new NextResponse('Channel not found', { status: 404 });
+    }
+
+    if (membership.role !== 'ADMIN') {
+      return new NextResponse('Forbidden', { status: 403 });
+    }
+
+    // Delete channel (cascade will handle related records)
+    const { error: deleteError } = await supabase
+      .from('channels')
+      .delete()
+      .eq('id', params.channelId);
+
+    if (deleteError) throw deleteError;
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('[CHANNEL_DELETE]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error deleting channel:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

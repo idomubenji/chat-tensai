@@ -1,6 +1,19 @@
 import { supabase } from './supabase';
-import type { Message, ChannelMember, User } from '@prisma/client';
+import type { Database } from '@/types/supabase';
 import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+
+export type Message = Database['public']['Tables']['messages']['Row'];
+export type User = Database['public']['Tables']['users']['Row'];
+export type ChannelMember = Database['public']['Tables']['channel_members']['Row'];
+
+export type RealtimeMessage = Message & {
+  user: User;
+};
+
+export type RealtimePresenceState = {
+  user_id: string;
+  online_at: string;
+};
 
 type RealtimeCallback<T extends { [key: string]: any }> = (payload: RealtimePostgresChangesPayload<T>) => void;
 

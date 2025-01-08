@@ -1,94 +1,48 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
-
-type ReactionWithUser = {
-  messageId: string;
-  userId: string;
-  emoji: string;
-  createdAt: Date;
-  user: {
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-  };
-};
-
-type GroupedReactions = Record<string, {
-  count: number;
-  users: Array<{
-    id: string;
-    name: string;
-    avatarUrl: string | null;
-  }>;
-}>;
-
-const reactionSchema = z.object({
-  emoji: z.string().min(1).max(10), // Unicode emoji or custom emoji ID
-});
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
 
 export async function GET(
   req: Request,
   { params }: { params: { channelId: string; messageId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user is a member of the channel
-    const membership = await prisma.channelMember.findUnique({
-      where: {
-        channelId_userId: {
-          channelId: params.channelId,
-          userId,
-        },
-      },
-    });
-
-    if (!membership) {
-      return new NextResponse('Not a channel member', { status: 403 });
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Get all reactions for the message with user details
-    const reactions = await (prisma as any).messageReaction.findMany({
-      where: {
-        messageId: params.messageId,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Group reactions by emoji
-    const groupedReactions = reactions.reduce((acc: GroupedReactions, reaction: ReactionWithUser) => {
-      if (!acc[reaction.emoji]) {
-        acc[reaction.emoji] = {
-          count: 0,
-          users: [],
-        };
-      }
-      acc[reaction.emoji].count++;
-      acc[reaction.emoji].users.push(reaction.user);
-      return acc;
-    }, {});
+    // Check if user is a member of the channel
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select()
+      .eq('channel_id', params.channelId)
+      .eq('user_id', userId)
+      .single();
 
-    return NextResponse.json(groupedReactions);
+    if (membershipError) {
+      return new NextResponse('Channel not found', { status: 404 });
+    }
+
+    // Get reactions for the message
+    const { data: reactions, error: reactionsError } = await supabase
+      .from('message_reactions')
+      .select(`
+        *,
+        user:users(*)
+      `)
+      .eq('message_id', params.messageId);
+
+    if (reactionsError) throw reactionsError;
+
+    return NextResponse.json(reactions);
   } catch (error) {
-    console.error('[MESSAGE_REACTIONS_GET]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error fetching reactions:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
@@ -96,114 +50,91 @@ export async function POST(
   req: Request,
   { params }: { params: { channelId: string; messageId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user is a member of the channel
-    const membership = await prisma.channelMember.findUnique({
-      where: {
-        channelId_userId: {
-          channelId: params.channelId,
-          userId,
-        },
-      },
-    });
-
-    if (!membership) {
-      return new NextResponse('Not a channel member', { status: 403 });
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const json = await req.json();
-    const body = reactionSchema.parse(json);
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    // Check if user is a member of the channel
+    const { data: membership, error: membershipError } = await supabase
+      .from('channel_members')
+      .select()
+      .eq('channel_id', params.channelId)
+      .eq('user_id', userId)
+      .single();
+
+    if (membershipError) {
+      return new NextResponse('Channel not found', { status: 404 });
+    }
+
+    const body = await req.json();
+    const { emoji } = body;
+
+    if (!emoji?.trim()) {
+      return new NextResponse('Emoji is required', { status: 400 });
+    }
 
     // Check if reaction already exists
-    const existingReaction = await (prisma as any).messageReaction.findUnique({
-      where: {
-        messageId_userId_emoji: {
-          messageId: params.messageId,
-          userId,
-          emoji: body.emoji,
-        },
-      },
-    });
+    const { data: existingReaction, error: existingError } = await supabase
+      .from('message_reactions')
+      .select()
+      .eq('message_id', params.messageId)
+      .eq('user_id', userId)
+      .eq('emoji', emoji)
+      .single();
 
     if (existingReaction) {
-      // Remove reaction if it exists
-      await (prisma as any).messageReaction.delete({
-        where: {
-          messageId_userId_emoji: {
-            messageId: params.messageId,
-            userId,
-            emoji: body.emoji,
-          },
-        },
-      });
+      // Remove existing reaction
+      const { error: deleteError } = await supabase
+        .from('message_reactions')
+        .delete()
+        .eq('message_id', params.messageId)
+        .eq('user_id', userId)
+        .eq('emoji', emoji);
+
+      if (deleteError) throw deleteError;
     } else {
+      // Check reaction limit per user
+      const { count, error: countError } = await supabase
+        .from('message_reactions')
+        .select('*', { count: 'exact', head: true })
+        .eq('message_id', params.messageId)
+        .eq('user_id', userId);
+
+      if (countError) throw countError;
+      if ((count ?? 0) >= 5) {
+        return new NextResponse('Reaction limit reached', { status: 400 });
+      }
+
       // Add new reaction
-      // First check if user has reached the reaction limit
-      const userReactionCount = await (prisma as any).messageReaction.count({
-        where: {
-          messageId: params.messageId,
-          userId,
-        },
-      });
+      const { error: insertError } = await supabase
+        .from('message_reactions')
+        .insert({
+          message_id: params.messageId,
+          user_id: userId,
+          emoji
+        });
 
-      if (userReactionCount >= 10) {
-        return new NextResponse('Maximum reactions reached', { status: 400 });
-      }
-
-      await (prisma as any).messageReaction.create({
-        data: {
-          messageId: params.messageId,
-          userId,
-          emoji: body.emoji,
-        },
-      });
+      if (insertError) throw insertError;
     }
 
-    // Return updated reactions for the message with user details
-    const reactions = await (prisma as any).messageReaction.findMany({
-      where: {
-        messageId: params.messageId,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-      orderBy: {
-        createdAt: 'asc',
-      },
-    });
+    // Get updated reactions
+    const { data: reactions, error: reactionsError } = await supabase
+      .from('message_reactions')
+      .select(`
+        *,
+        user:users(*)
+      `)
+      .eq('message_id', params.messageId);
 
-    // Group reactions by emoji
-    const groupedReactions = reactions.reduce((acc: GroupedReactions, reaction: ReactionWithUser) => {
-      if (!acc[reaction.emoji]) {
-        acc[reaction.emoji] = {
-          count: 0,
-          users: [],
-        };
-      }
-      acc[reaction.emoji].count++;
-      acc[reaction.emoji].users.push(reaction.user);
-      return acc;
-    }, {});
+    if (reactionsError) throw reactionsError;
 
-    return NextResponse.json(groupedReactions);
+    return NextResponse.json(reactions);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return new NextResponse('Invalid request data', { status: 422 });
-    }
-
-    console.error('[MESSAGE_REACTION]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error managing reaction:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

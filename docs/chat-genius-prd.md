@@ -30,7 +30,7 @@ These user stories will guide the design of workflows and permissions for both r
 
 #### **1. User Model**
 
-- **Fields**: `id` (UUID, primary key), `email` (string, unique), `name` (string), `avatar_url` (string), `status` (enum: "online", "offline", "away"), `role` (enum: "admin", "user"), `created_at` (timestamp), `updated_at` (timestamp).
+- **Fields**: `id` (UUID, primary key), `email` (string, unique), `name` (string), `bio` (string, nullable), `avatar_url` (string), `status` (enum: "online", "offline", "away", "dnd"), `status_message` (string, max 25 chars, nullable), `status_emoji` (string, nullable), `role` (enum: "admin", "user"), `created_at` (timestamp), `updated_at` (timestamp).
 - **Relationships**: One-to-Many with Messages (a user can send many messages), Many-to-Many with Channels via `ChannelMembers`.
 
 #### **2. Channel Model**

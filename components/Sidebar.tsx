@@ -9,6 +9,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { MessageSquare, Hash } from "lucide-react";
 import { ProfilePicture } from "./ProfilePicture";
+import { SignOutButton } from "./SignOutButton";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -71,10 +72,11 @@ export function Sidebar() {
           </AccordionItem>
         </Accordion>
       </div>
-      <div className="mt-auto pt-4">
-        <Link href="/settings" className="block">
+      <div className="mt-auto pt-4 flex items-center justify-between">
+        <Link href="/settings">
           <ProfilePicture />
         </Link>
+        <SignOutButton />
       </div>
     </div>
   );

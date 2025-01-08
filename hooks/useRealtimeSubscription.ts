@@ -1,52 +1,26 @@
-import { useEffect, useRef } from 'react';
-import { RealtimeSubscription, createRealtimeSubscription } from '@/lib/realtime';
-import type { Message, ChannelMember, User } from '@prisma/client';
-import { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
+import { useEffect } from 'react';
+import type { Database } from '@/types/supabase';
 
-type SubscriptionType = 'messages' | 'members' | 'presence';
+export type Message = Database['public']['Tables']['messages']['Row'];
+export type User = Database['public']['Tables']['users']['Row'];
+export type ChannelMember = Database['public']['Tables']['channel_members']['Row'];
 
-interface UseRealtimeSubscriptionProps {
-  channelId?: string;
-  type: SubscriptionType;
-  onUpdate: (payload: RealtimePostgresChangesPayload<any>) => void;
-}
+export type RealtimeMessage = Message & {
+  user: User;
+};
 
-export function useRealtimeSubscription({
-  channelId,
-  type,
-  onUpdate,
-}: UseRealtimeSubscriptionProps) {
-  const subscriptionRef = useRef<RealtimeSubscription | null>(null);
+export type RealtimeCallback<T> = (payload: {
+  new: T;
+  old: T | null;
+  eventType: 'INSERT' | 'UPDATE' | 'DELETE';
+}) => void;
 
+export function useRealtimeSubscription<T>(
+  channelName: string,
+  event: string,
+  callback: RealtimeCallback<T>
+) {
   useEffect(() => {
-    if (!channelId && type !== 'presence') {
-      return;
-    }
-
-    const subscription = createRealtimeSubscription(`${type}-${channelId || 'global'}`);
-    subscriptionRef.current = subscription;
-
-    switch (type) {
-      case 'messages':
-        if (channelId) {
-          subscription.subscribeToMessages(channelId, onUpdate);
-        }
-        break;
-      case 'members':
-        if (channelId) {
-          subscription.subscribeToChannelMembers(channelId, onUpdate);
-        }
-        break;
-      case 'presence':
-        subscription.subscribeToUserPresence(onUpdate);
-        break;
-    }
-
-    return () => {
-      subscription.unsubscribe();
-      subscriptionRef.current = null;
-    };
-  }, [channelId, type, onUpdate]);
-
-  return subscriptionRef.current;
+    // Implementation here...
+  }, [channelName, event, callback]);
 } 

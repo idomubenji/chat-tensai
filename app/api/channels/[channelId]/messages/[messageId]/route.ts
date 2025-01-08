@@ -1,79 +1,68 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
 
-const updateMessageSchema = z.object({
-  content: z.string().min(1).max(2000),
-});
-
-async function canManageMessage(userId: string, messageId: string) {
-  const message = await prisma.message.findUnique({
-    where: { id: messageId },
-    select: {
-      userId: true,
-      channel: {
-        select: {
-          channelMembers: {
-            where: {
-              userId,
-              roleInChannel: 'ADMIN',
-            },
-          },
-        },
-      },
-    },
-  });
-
-  if (!message) return false;
-
-  // User can manage if they are the author or a channel admin
-  return message.userId === userId || message.channel.channelMembers.length > 0;
-}
-
-export async function PUT(
+export async function PATCH(
   req: Request,
   { params }: { params: { channelId: string; messageId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user can edit the message
-    if (!(await canManageMessage(userId, params.messageId))) {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    // Check if message exists and belongs to user
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('user_id')
+      .eq('id', params.messageId)
+      .eq('channel_id', params.channelId)
+      .single();
+
+    if (messageError) {
+      return new NextResponse('Message not found', { status: 404 });
+    }
+
+    if (message.user_id !== userId) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    const json = await req.json();
-    const body = updateMessageSchema.parse(json);
+    const body = await req.json();
+    const { content } = body;
 
-    const message = await prisma.message.update({
-      where: { id: params.messageId },
-      data: {
-        content: body.content,
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatarUrl: true,
-          },
-        },
-      },
-    });
-
-    return NextResponse.json(message);
-  } catch (error) {
-    if (error instanceof z.ZodError) {
-      return new NextResponse('Invalid request data', { status: 422 });
+    if (!content?.trim()) {
+      return new NextResponse('Message content is required', { status: 400 });
     }
 
-    console.error('[MESSAGE_UPDATE]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    // Update message
+    const { data: updatedMessage, error: updateError } = await supabase
+      .from('messages')
+      .update({
+        content,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', params.messageId)
+      .select(`
+        *,
+        user:users(*),
+        reactions:message_reactions(
+          *,
+          user:users(*)
+        )
+      `)
+      .single();
+
+    if (updateError) throw updateError;
+
+    return NextResponse.json(updatedMessage);
+  } catch (error) {
+    console.error('Error updating message:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
@@ -81,25 +70,41 @@ export async function DELETE(
   req: Request,
   { params }: { params: { channelId: string; messageId: string } }
 ) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
   try {
-    // Check if user can delete the message
-    if (!(await canManageMessage(userId, params.messageId))) {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    // Check if message exists and belongs to user
+    const { data: message, error: messageError } = await supabase
+      .from('messages')
+      .select('user_id')
+      .eq('id', params.messageId)
+      .eq('channel_id', params.channelId)
+      .single();
+
+    if (messageError) {
+      return new NextResponse('Message not found', { status: 404 });
+    }
+
+    if (message.user_id !== userId) {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
-    await prisma.message.delete({
-      where: { id: params.messageId },
-    });
+    // Delete message (cascade will handle reactions and files)
+    const { error: deleteError } = await supabase
+      .from('messages')
+      .delete()
+      .eq('id', params.messageId);
+
+    if (deleteError) throw deleteError;
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('[MESSAGE_DELETE]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error deleting message:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

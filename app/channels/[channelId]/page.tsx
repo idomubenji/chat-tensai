@@ -1,18 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { ChatWindow } from "@/components/ChatWindow";
 import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThreadWindow } from "@/components/ThreadWindow";
-
-// Temporary mock data - move to a shared location later
-const mockChannels = [
-  { id: "1", name: "general" },
-  { id: "2", name: "random" },
-  { id: "3", name: "project-a" },
-];
+import { useChannels } from "@/hooks/useChannels";
+import type { Database } from '@/types/supabase';
 
 type Message = {
   id: string;
@@ -37,20 +32,13 @@ export default function ChannelPage({
 }) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [loading, setLoading] = useState(true);
-  const channel = mockChannels.find((c) => c.id === params.channelId);
+  const { channels, loading: channelsLoading } = useChannels();
+  const channel = channels.find((c) => c.id === params.channelId);
   const { isLoaded, userId } = useAuth();
   const router = useRouter();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
-  useEffect(() => {
-    if (isLoaded && !userId) {
-      router.push('/sign-in');
-      return;
-    }
-    fetchMessages();
-  }, [isLoaded, userId, params.channelId]);
-
-  const fetchMessages = async () => {
+  const fetchMessages = useCallback(async () => {
     if (!userId) return; // Don't fetch if not authenticated
     try {
       const response = await fetch(
@@ -64,7 +52,28 @@ export default function ChannelPage({
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId, params.channelId]);
+
+  // Handle authentication
+  useEffect(() => {
+    if (isLoaded && !userId) {
+      router.push('/sign-in');
+    }
+  }, [isLoaded, userId, router]);
+
+  // Handle message fetching
+  useEffect(() => {
+    if (userId) {
+      fetchMessages();
+    }
+  }, [userId, fetchMessages]);
+
+  // Handle channel not found
+  useEffect(() => {
+    if (!channelsLoading && !channel && userId) {
+      router.push('/');
+    }
+  }, [channelsLoading, channel, router, userId]);
 
   const handleMessageSent = async (content: string) => {
     if (!userId) return; // Don't send if not authenticated
@@ -120,6 +129,31 @@ export default function ChannelPage({
     return null;
   }
 
+  // Show loading state while fetching channels
+  if (channelsLoading) {
+    return <div className="flex h-screen items-center justify-center">Loading channels...</div>;
+  }
+
+  // Return loading state while redirecting
+  if (!channel) {
+    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
+  }
+
+  const handleReply = async (content: string) => {
+    if (!selectedMessage) return;
+    const newReply = {
+      id: Math.random().toString(),
+      content,
+      userId,
+      userName: messages.find(m => m.userId === userId)?.userName || 'Unknown User',
+      createdAt: new Date().toISOString(),
+      reactions: {}
+    };
+    handleMessageUpdate(selectedMessage.id, {
+      replies: [...(selectedMessage.replies || []), newReply]
+    });
+  };
+
   return (
     <div className="flex h-full">
       <div className={cn(
@@ -128,8 +162,11 @@ export default function ChannelPage({
       )}>
         <div className="p-4 border-b bg-[#445566] text-white">
           <h1 className="text-2xl font-bold">
-            #{channel?.name || "unknown-channel"}
+            #{channel.name}
           </h1>
+          {channel.description && (
+            <p className="text-sm text-gray-300">{channel.description}</p>
+          )}
         </div>
         <div className="flex-1 min-h-0">
           <ChatWindow
@@ -150,20 +187,8 @@ export default function ChannelPage({
           <ThreadWindow
             parentMessage={messages.find(m => m.id === selectedMessage.id) || selectedMessage}
             replies={selectedMessage.replies || []}
-            currentUserId={userId || ''}
-            onSendReply={async (content) => {
-              const newReply = {
-                id: Math.random().toString(),
-                content,
-                userId: userId || '',
-                userName: messages.find(m => m.userId === userId)?.userName || '',
-                createdAt: new Date().toISOString(),
-                reactions: {}
-              };
-              handleMessageUpdate(selectedMessage.id, {
-                replies: [...(selectedMessage.replies || []), newReply]
-              });
-            }}
+            currentUserId={userId}
+            onSendReply={handleReply}
             onReactionUpdate={handleReactionUpdate}
             onClose={() => setSelectedMessage(null)}
           />

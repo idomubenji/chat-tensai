@@ -1,41 +1,38 @@
-import { NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs';
-import { prisma } from '@/lib/prisma';
-import { z } from 'zod';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
+import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
 
-const updateStatusSchema = z.object({
-  status: z.enum(['ONLINE', 'OFFLINE', 'AWAY']),
-});
-
-export async function PUT(req: Request) {
-  const { userId } = auth();
-
-  if (!userId) {
-    return new NextResponse('Unauthorized', { status: 401 });
-  }
-
+export async function PATCH(req: Request) {
   try {
-    const json = await req.json();
-    const body = updateStatusSchema.parse(json);
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
 
-    const user = await prisma.user.update({
-      where: { id: userId },
-      data: {
-        status: body.status,
-      },
-      select: {
-        id: true,
-        status: true,
-      },
-    });
+    const body = await req.json();
+    const { status } = body;
+
+    if (!status || !['ONLINE', 'AWAY', 'OFFLINE'].includes(status)) {
+      return new NextResponse('Invalid status', { status: 400 });
+    }
+
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+
+    // Update user status
+    const { data: user, error: updateError } = await supabase
+      .from('users')
+      .update({ status })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (updateError) throw updateError;
 
     return NextResponse.json(user);
   } catch (error) {
-    if (error instanceof z.ZodError) {
-      return new NextResponse('Invalid request data', { status: 422 });
-    }
-
-    console.error('[USER_STATUS_UPDATE]', error);
-    return new NextResponse('Internal Error', { status: 500 });
+    console.error('Error updating user status:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 

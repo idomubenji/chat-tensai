@@ -1,9 +1,9 @@
 -- Grant necessary permissions to the service role
-GRANT USAGE ON SCHEMA public TO postgres;
-GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres;
+GRANT USAGE ON SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO postgres, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO postgres, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO postgres, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO postgres, service_role;
 
 -- Create ENUMs if they don't exist
 DO $$ BEGIN
@@ -24,17 +24,28 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
+-- Drop existing policies first to handle dependencies
+DROP POLICY IF EXISTS "Users are viewable by everyone" ON users;
+DROP POLICY IF EXISTS "Users can update own record" ON users;
+DROP POLICY IF EXISTS "Public channels are viewable by everyone" ON channels;
+DROP POLICY IF EXISTS "Channel members can insert messages" ON messages;
+DROP POLICY IF EXISTS "Channel members can view messages" ON messages;
+DROP POLICY IF EXISTS "Message authors can update their messages" ON messages;
+DROP POLICY IF EXISTS "Channel members can add reactions" ON message_reactions;
+DROP POLICY IF EXISTS "Channel members can view reactions" ON message_reactions;
+DROP POLICY IF EXISTS "Channel members can view files" ON files;
+
 -- Drop existing tables if they exist (comment out if you want to preserve data)
--- DROP TABLE IF EXISTS files;
--- DROP TABLE IF EXISTS message_reactions;
--- DROP TABLE IF EXISTS messages;
--- DROP TABLE IF EXISTS channel_members;
--- DROP TABLE IF EXISTS channels;
--- DROP TABLE IF EXISTS users;
+DROP TABLE IF EXISTS files CASCADE;
+DROP TABLE IF EXISTS message_reactions CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS channel_members CASCADE;
+DROP TABLE IF EXISTS channels CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
 
 -- Create users table
 CREATE TABLE IF NOT EXISTS users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY,
   email TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   avatar_url TEXT,
@@ -50,7 +61,7 @@ CREATE TABLE IF NOT EXISTS channels (
   name TEXT NOT NULL UNIQUE,
   description TEXT,
   is_private BOOLEAN NOT NULL DEFAULT FALSE,
-  created_by_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_by_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -59,7 +70,7 @@ CREATE TABLE IF NOT EXISTS channels (
 CREATE TABLE IF NOT EXISTS channel_members (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   role_in_channel channel_role NOT NULL DEFAULT 'MEMBER',
   joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE(channel_id, user_id)
@@ -70,7 +81,7 @@ CREATE TABLE IF NOT EXISTS messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   content TEXT NOT NULL,
   channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   parent_id UUID REFERENCES messages(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -79,7 +90,7 @@ CREATE TABLE IF NOT EXISTS messages (
 -- Create message_reactions table
 CREATE TABLE IF NOT EXISTS message_reactions (
   message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   emoji TEXT NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (message_id, user_id, emoji)
@@ -90,7 +101,7 @@ CREATE TABLE IF NOT EXISTS files (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   url TEXT NOT NULL,
   message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
   uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -185,17 +196,6 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies to avoid duplicates
-DROP POLICY IF EXISTS "Users are viewable by everyone" ON users;
-DROP POLICY IF EXISTS "Users can update own record" ON users;
-DROP POLICY IF EXISTS "Public channels are viewable by everyone" ON channels;
-DROP POLICY IF EXISTS "Channel members can insert messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can view messages" ON messages;
-DROP POLICY IF EXISTS "Message authors can update their messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can add reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view files" ON files;
-
 -- RLS Policies
 -- Users can read all users
 CREATE POLICY "Users are viewable by everyone" ON users
@@ -203,35 +203,35 @@ CREATE POLICY "Users are viewable by everyone" ON users
 
 -- Users can update their own record
 CREATE POLICY "Users can update own record" ON users
-  FOR UPDATE USING (auth.uid() = id);
+  FOR UPDATE USING (auth.uid()::text = id);
 
 -- Channels policies
 CREATE POLICY "Public channels are viewable by everyone" ON channels
   FOR SELECT USING (NOT is_private OR EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = id AND user_id = auth.uid()
+    SELECT 1 FROM channel_members WHERE channel_id = id AND user_id = auth.uid()::text
   ));
 
 CREATE POLICY "Channel members can insert messages" ON messages
   FOR INSERT WITH CHECK (EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()
+    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()::text
   ));
 
 -- Messages are viewable by channel members
 CREATE POLICY "Channel members can view messages" ON messages
   FOR SELECT USING (EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()
+    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()::text
   ));
 
 -- Message authors can update their messages
 CREATE POLICY "Message authors can update their messages" ON messages
-  FOR UPDATE USING (auth.uid() = user_id);
+  FOR UPDATE USING (auth.uid()::text = user_id);
 
 -- Channel members can add reactions
 CREATE POLICY "Channel members can add reactions" ON message_reactions
   FOR INSERT WITH CHECK (EXISTS (
     SELECT 1 FROM messages m
     JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()
+    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
   ));
 
 -- Channel members can view reactions
@@ -239,7 +239,7 @@ CREATE POLICY "Channel members can view reactions" ON message_reactions
   FOR SELECT USING (EXISTS (
     SELECT 1 FROM messages m
     JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()
+    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
   ));
 
 -- Files policies similar to messages
@@ -247,5 +247,5 @@ CREATE POLICY "Channel members can view files" ON files
   FOR SELECT USING (EXISTS (
     SELECT 1 FROM messages m
     JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()
+    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
   )); 

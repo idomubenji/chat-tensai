@@ -1,12 +1,40 @@
+import Image from 'next/image';
+import { useEffect, useState } from 'react';
+
 export function ProfilePicture() {
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      try {
+        const response = await fetch('/api/users/me');
+        if (response.ok) {
+          const data = await response.json();
+          const customAvatar = data.avatar_url && !data.avatar_url.includes('img.clerk.com') 
+            ? data.avatar_url 
+            : '/default-avatar.jpeg';
+          setAvatarUrl(customAvatar);
+        }
+      } catch (error) {
+        console.error('Error fetching user profile:', error);
+      }
+    };
+
+    fetchUserProfile();
+  }, []);
+
   return (
-    <svg width="40" height="40" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
-      <circle cx="20" cy="20" r="20" fill="#FFB7C5"/>
-      <circle cx="20" cy="17" r="12" fill="#FFF0F5"/>
-      <circle cx="16" cy="15" r="2" fill="#000"/>
-      <circle cx="24" cy="15" r="2" fill="#000"/>
-      <path d="M16 22C17.5 24 22.5 24 24 22" stroke="#000" strokeWidth="1.5" strokeLinecap="round"/>
-    </svg>
-  )
+    <div className="relative w-10 h-10">
+      <Image
+        src={avatarUrl || "/default-avatar.jpeg"}
+        alt="Profile"
+        fill
+        sizes="40px"
+        className="rounded-full object-cover border-2 border-black"
+        priority
+        unoptimized={!avatarUrl}
+      />
+    </div>
+  );
 }
 
