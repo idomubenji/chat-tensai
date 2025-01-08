@@ -45,3 +45,6 @@ Thumbs.db
 # AWS
 .aws/
 aws.json
+
+# Docs
+docs/
