@@ -40,3 +40,31 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AWS configuration and secrets
+.aws/
+aws.json
+aws.config
+aws-config.json
+parameters.json
+**/parameters.json
+scripts/add-parameters.sh
+temp_credentials.json
+.aws-credentials
+aws-credentials.json
+
+# IDE and editor files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+logs
+*.log
+
+# Runtime data
+pids
+*.pid
+*.seed
+*.pid.lock
