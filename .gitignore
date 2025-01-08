@@ -30,8 +30,8 @@ yarn-error.log*
 .env
 
 # AWS
-/.aws
-/.github/workflows
+.aws
+.github/workflows
 
 
 # vercel
