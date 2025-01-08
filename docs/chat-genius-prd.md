@@ -231,16 +231,16 @@ Our Slack Clone is a real-time messaging platform for teams, supporting channels
 
 ### **Deployment Architecture**
 
-#### **Amazon ECS Infrastructure**
+#### **Amazon EC2 Infrastructure**
 
-1. **Container Architecture**:
-   - Application containers running on ECS Fargate
-   - Auto-scaling based on CPU and memory metrics
+1. **Server Architecture**:
+   - Application running on EC2 instances
+   - Auto-scaling group for handling load
    - Load balancing across multiple availability zones
-   - Health checks and automatic container recovery
+   - Health checks and automatic instance recovery
 
 2. **Service Components**:
-   - Web application containers
+   - Web application server
    - WebSocket service for real-time communication
    - Background workers for file processing
    - Scheduled tasks for maintenance
@@ -248,13 +248,13 @@ Our Slack Clone is a real-time messaging platform for teams, supporting channels
 3. **Networking**:
    - Application Load Balancer for HTTP/HTTPS traffic
    - VPC configuration with public and private subnets
-   - Security groups for container access control
+   - Security groups for instance access control
    - CloudFront CDN for static assets and file delivery
 
 4. **Monitoring and Logging**:
-   - CloudWatch for container logs and metrics
+   - CloudWatch for instance logs and metrics
    - X-Ray for distributed tracing
-   - Container Insights for performance monitoring
+   - EC2 instance monitoring
    - Automated alerts for service health
 
 5. **CI/CD Pipeline**:
