@@ -28,9 +28,9 @@ export function SignOutButton() {
             variant="ghost"
             size="icon"
             onClick={handleSignOut}
-            className="text-white hover:text-gray-200 hover:bg-[#5A7593] border-2 border-black rounded-full"
+            className="w-12 h-12 text-white hover:text-gray-200 hover:bg-[#5A7593] border-2 border-black rounded-full transition-colors"
           >
-            <LogOut className="h-5 w-5" />
+            <LogOut className="h-6 w-6" />
           </Button>
         </TooltipTrigger>
         <TooltipContent>

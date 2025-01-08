@@ -241,4 +241,37 @@ export async function POST(req: Request) {
       { status: 500 }
     );
   }
+}
+
+export async function DELETE() {
+  try {
+    const { userId } = auth();
+    if (!userId) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
+
+    // Update user in database to use default avatar
+    const { data, error } = await supabaseAdmin
+      .from('users')
+      .update({
+        avatar_url: '/default-avatar.jpeg',
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error removing avatar:', error);
+      return new NextResponse('Failed to remove avatar', { status: 500 });
+    }
+
+    return NextResponse.json({ avatar_url: '/default-avatar.jpeg' });
+  } catch (error) {
+    console.error('Error in avatar removal:', error);
+    return new NextResponse(
+      error instanceof Error ? error.message : 'Internal Server Error',
+      { status: 500 }
+    );
+  }
 } 

@@ -129,6 +129,24 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRemoveAvatar = async () => {
+    try {
+      const response = await fetch('/api/users/me/avatar', {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to remove avatar');
+      }
+
+      const data = await response.json();
+      setSettings(prev => ({ ...prev, avatar_url: data.avatar_url }));
+    } catch (error) {
+      console.error('Error removing avatar:', error);
+      alert('Failed to remove profile picture');
+    }
+  };
+
   // Show loading state while checking auth
   if (!isLoaded) {
     return <LoadingBall />;
@@ -161,7 +179,7 @@ export default function SettingsPage() {
                   unoptimized={!settings.avatar_url}
                 />
               </div>
-              <div>
+              <div className="space-y-4">
                 <Input
                   type="file"
                   accept="image/*"
@@ -169,9 +187,18 @@ export default function SettingsPage() {
                   disabled={isUploading}
                   className="bg-white"
                 />
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-gray-500">
                   {isUploading ? 'Uploading...' : 'Upload a new profile picture'}
                 </p>
+                {settings.avatar_url && settings.avatar_url !== '/default-avatar.jpeg' && (
+                  <Button
+                    variant="outline"
+                    onClick={handleRemoveAvatar}
+                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
+                  >
+                    Remove Profile Picture
+                  </Button>
+                )}
               </div>
             </div>
           </div>
