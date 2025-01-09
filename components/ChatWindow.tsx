@@ -168,78 +168,81 @@ export function ChatWindow({
             <div
               key={message.id}
               className={cn(
-                "group flex flex-col gap-1",
+                "group flex flex-col gap-1 w-full",
                 isCurrentUser ? "items-end" : "items-start"
               )}
             >
-              <div className={cn("flex items-start gap-2 w-full", isCurrentUser ? "flex-row-reverse justify-start" : "flex-row")}>
-                <div className={cn("flex flex-col min-w-0 max-w-[calc(100%-3rem)]", isCurrentUser ? "items-end" : "items-start")}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-600">
-                      {new Date(message.createdAt).toLocaleTimeString()}
-                    </span>
-                    <UserName
-                      name={message.userName}
-                      userId={message.userId}
-                      role={message.userRole}
-                    />
-                  </div>
-                  <div className="flex items-start gap-2">
-                    {isCurrentUser && (
-                      <>
-                        <MessageReplyButton
-                          onClick={() => handleSelectMessage(message)}
-                          align="start"
-                        />
-                        <MessageReactions
-                          messageId={message.id}
-                          currentUserId={userId || ''}
-                          onReactionSelect={handleReactionSelect}
-                          align="start"
-                        />
-                      </>
-                    )}
-                    <div
-                      className={cn(
-                        "rounded-lg px-4 py-2 text-sm break-words",
-                        isCurrentUser
-                          ? "bg-pink-200 text-gray-900"
-                          : "bg-[#223344] text-white"
-                      )}
-                    >
-                      {message.content}
-                    </div>
-                    {!isCurrentUser && (
-                      <>
-                        <MessageReactions
-                          messageId={message.id}
-                          currentUserId={userId || ''}
-                          onReactionSelect={handleReactionSelect}
-                          align="end"
-                        />
-                        <MessageReplyButton
-                          onClick={() => handleSelectMessage(message)}
-                          align="end"
-                        />
-                      </>
-                    )}
-                  </div>
-                  {replyCount > 0 && (
-                    <div
-                      onClick={() => handleSelectMessage(message)}
-                      className={cn(
-                        "text-sm text-blue-500 hover:underline mt-1 mb-1 cursor-pointer",
-                        isCurrentUser ? "text-right" : "text-left"
-                      )}
-                    >
-                      View {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
-                    </div>
+              <div className={cn(
+                "flex flex-col max-w-[70%]",
+                isCurrentUser ? "items-end" : "items-start"
+              )}>
+                <div className="flex items-center gap-2 mb-1">
+                  {isCurrentUser ? (
+                    <>
+                      <span className="text-xs text-gray-600">
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      <UserName
+                        name={message.userName}
+                        userId={message.userId}
+                        role={message.userRole}
+                      />
+                    </>
+                  ) : (
+                    <>
+                      <UserName
+                        name={message.userName}
+                        userId={message.userId}
+                        role={message.userRole}
+                      />
+                      <span className="text-xs text-gray-600">
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </>
                   )}
                 </div>
+                <div className={cn(
+                  "flex items-start gap-2",
+                  isCurrentUser && "flex-row-reverse"
+                )}>
+                  <div
+                    className={cn(
+                      "rounded-lg px-4 py-2 text-sm break-words",
+                      isCurrentUser
+                        ? "bg-pink-200 text-gray-900"
+                        : "bg-[#223344] text-white"
+                    )}
+                  >
+                    {message.content}
+                  </div>
+                  <div className={cn(
+                    "flex items-center gap-1",
+                    isCurrentUser && "flex-row-reverse"
+                  )}>
+                    <MessageReactions
+                      messageId={message.id}
+                      currentUserId={userId || ''}
+                      onReactionSelect={handleReactionSelect}
+                      align={isCurrentUser ? "start" : "end"}
+                    />
+                    <MessageReplyButton
+                      onClick={() => handleSelectMessage(message)}
+                      align={isCurrentUser ? "start" : "end"}
+                    />
+                  </div>
+                </div>
+                {replyCount > 0 && (
+                  <div
+                    onClick={() => handleSelectMessage(message)}
+                    className="text-sm text-blue-500 hover:underline mt-1 cursor-pointer"
+                  >
+                    View {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
+                  </div>
+                )}
               </div>
               {Object.entries(message.reactions).length > 0 && (
                 <div className={cn(
-                  "flex flex-wrap gap-1 max-w-[calc(100%-3rem)]",
+                  "flex flex-wrap gap-1",
                   isCurrentUser ? "self-end" : "self-start"
                 )}>
                   {Object.entries(message.reactions).map(([emoji, reaction]) => (

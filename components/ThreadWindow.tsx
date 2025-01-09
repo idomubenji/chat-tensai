@@ -107,14 +107,29 @@ export function ThreadWindow({
         <div className={cn("flex items-start gap-2 w-full", isCurrentUser ? "flex-row-reverse justify-start" : "flex-row")}>
           <div className={cn("flex flex-col min-w-0 max-w-[calc(100%-3rem)]", isCurrentUser ? "items-end" : "items-start")}>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-gray-600">
-                {new Date(message.createdAt).toLocaleTimeString()}
-              </span>
-              <UserName
-                name={message.userName}
-                userId={message.userId}
-                role={message.userRole}
-              />
+              {isCurrentUser ? (
+                <>
+                  <span className="text-xs text-gray-600">
+                    {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                  <UserName
+                    name={message.userName}
+                    userId={message.userId}
+                    role={message.userRole}
+                  />
+                </>
+              ) : (
+                <>
+                  <UserName
+                    name={message.userName}
+                    userId={message.userId}
+                    role={message.userRole}
+                  />
+                  <span className="text-xs text-gray-600">
+                    {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                </>
+              )}
             </div>
             <div className="flex items-start gap-2">
               {isCurrentUser && (
@@ -130,7 +145,7 @@ export function ThreadWindow({
                   "rounded-lg px-4 py-2 text-sm break-words group cursor-pointer",
                   isCurrentUser
                     ? "bg-pink-200 text-gray-900"
-                    : "bg-white text-gray-900"
+                    : "bg-[#223344] text-white"
                 )}
                 onClick={() => !isParent && setReplyingTo(message)}
               >

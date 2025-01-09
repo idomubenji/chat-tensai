@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/accordion";
 import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
+import { ProfilePicture } from '@/components/ProfilePicture';
+import { SignOutButton } from '@/components/SignOutButton';
 
 export function Sidebar() {
   const router = useRouter();
@@ -123,6 +125,15 @@ export function Sidebar() {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
+      </div>
+      <div className="mt-4 flex items-center justify-between border-t border-[#5A7593] pt-4">
+        <button 
+          onClick={() => router.push('/settings')} 
+          className="flex items-center hover:opacity-80 transition-opacity"
+        >
+          <ProfilePicture />
+        </button>
+        <SignOutButton />
       </div>
     </div>
   );

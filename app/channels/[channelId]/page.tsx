@@ -53,7 +53,28 @@ export default function ChannelPage({
       );
       if (!response.ok) throw new Error("Failed to fetch messages");
       const data = await response.json();
-      setMessages(data);
+      
+      // Transform the messages to include user data
+      const transformedMessages = data.map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        userId: msg.user_id,
+        userName: msg.user?.name || 'Unknown User',
+        createdAt: msg.created_at,
+        reactions: msg.reactions?.reduce((acc: any, reaction: any) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              userIds: []
+            };
+          }
+          acc[reaction.emoji].userIds.push(reaction.user_id);
+          return acc;
+        }, {}),
+        parentId: msg.parent_id
+      }));
+
+      setMessages(transformedMessages);
     } catch (error) {
       console.error("Error fetching messages:", error);
     } finally {
@@ -113,9 +134,20 @@ export default function ChannelPage({
 
       if (!response.ok) throw new Error("Failed to send message");
 
+      // Transform the new message to match the expected format
+      const newMessageData = await response.json();
+      const transformedMessage = {
+        id: newMessageData.id,
+        content: newMessageData.content,
+        userId: newMessageData.user_id,
+        userName: newMessageData.user?.name || 'Unknown User',
+        createdAt: newMessageData.created_at,
+        reactions: {},
+        parentId: newMessageData.parent_id
+      };
+
       // Add the new message to the state immediately
-      const newMessage = await response.json();
-      setMessages(prev => [...prev, newMessage]);
+      setMessages(prev => [...prev, transformedMessage]);
     } catch (error) {
       console.error("Error sending message:", error);
     }

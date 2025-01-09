@@ -13,11 +13,12 @@ const fetcher = async (url: string) => {
 };
 
 export function ProfilePicture() {
-  // SWR will automatically cache the result and revalidate periodically
+  // SWR will automatically cache the result and revalidate when needed
   const { data: avatarUrl, error } = useSWR('/api/users/me', fetcher, {
-    revalidateOnFocus: false, // Don't revalidate when window focuses
-    revalidateOnReconnect: false, // Don't revalidate on reconnection
-    dedupingInterval: 60000, // Only make one request per minute
+    revalidateOnFocus: true,
+    revalidateOnReconnect: true,
+    refreshInterval: 30000, // Refresh every 30 seconds
+    dedupingInterval: 5000, // Only make one request per 5 seconds
   });
 
   if (error) console.error('Error loading avatar:', error);
