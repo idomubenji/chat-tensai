@@ -7,191 +7,125 @@ dotenv.config();
 // Initialize Supabase admin client
 const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
+  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  }
 );
-
-async function verifyData() {
-  console.log('\n=== Verifying Database State ===\n');
-
-  // Check users
-  const { data: users, error: usersError } = await supabase
-    .from('users')
-    .select('*');
-  
-  if (usersError) {
-    console.error('Error fetching users:', usersError);
-  } else {
-    console.log(`Found ${users.length} users:`);
-    users.forEach(user => {
-      console.log(`- User ${user.id}: ${user.name} (${user.email})`);
-    });
-  }
-
-  // Check channels
-  const { data: channels, error: channelsError } = await supabase
-    .from('channels')
-    .select('*');
-  
-  if (channelsError) {
-    console.error('Error fetching channels:', channelsError);
-  } else {
-    console.log(`\nFound ${channels.length} channels:`);
-    channels.forEach(channel => {
-      console.log(`- Channel ${channel.id}: ${channel.name} (created by ${channel.created_by_id})`);
-    });
-  }
-
-  // Check channel members
-  const { data: members, error: membersError } = await supabase
-    .from('channel_members')
-    .select(`
-      *,
-      channel:channels(name),
-      user:users(name)
-    `);
-  
-  if (membersError) {
-    console.error('Error fetching channel members:', membersError);
-  } else {
-    console.log(`\nFound ${members.length} channel members:`);
-    members.forEach(member => {
-      console.log(`- Member: ${member.user?.name} in ${member.channel?.name} (role: ${member.role})`);
-    });
-  }
-
-  // Check messages
-  const { data: messages, error: messagesError } = await supabase
-    .from('messages')
-    .select(`
-      *,
-      channel:channels(name),
-      author:users!messages_user_id_fkey(name)
-    `);
-  
-  if (messagesError) {
-    console.error('Error fetching messages:', messagesError);
-  } else {
-    console.log(`\nFound ${messages.length} messages:`);
-    messages.forEach(message => {
-      console.log(`- Message in ${message.channel?.name} by ${message.author?.name}: ${message.content}`);
-    });
-  }
-}
 
 async function main() {
   try {
-    // Get the first user (assuming they exist)
+    // Get the first user (you)
+    console.log('Fetching users...');
     const { data: users, error: userError } = await supabase
       .from('users')
-      .select('*')
-      .limit(1);
+      .select('*');
 
     if (userError) throw userError;
+    console.log('All users:', users);
+
     if (!users || users.length === 0) {
-      console.log('No users found. Please sign in first to create a user.');
-      return;
+      throw new Error('No users found');
     }
 
     const user = users[0];
-    console.log('Found user:', user);
+    console.log('Selected user:', user);
 
-    // First check if general channel exists
-    const { data: existingChannel, error: findError } = await supabase
+    // Check for #general channel
+    console.log('\nChecking for #general channel...');
+    const { data: existingChannel, error: channelError } = await supabase
       .from('channels')
       .select('*')
-      .eq('name', 'general')
+      .eq('name', '#general')
       .single();
 
-    if (findError && findError.code !== 'PGRST116') { // PGRST116 is "not found"
-      throw findError;
-    }
+    if (channelError && channelError.code !== 'PGRST116') throw channelError;
 
     let channel = existingChannel;
-
-    // Create channel only if it doesn't exist
     if (!channel) {
-      const { data: newChannel, error: channelError } = await supabase
+      console.log('Creating #general channel...');
+      const { data: newChannel, error: createError } = await supabase
         .from('channels')
         .insert({
-          name: 'general',
-          description: 'General discussion',
+          name: '#general',
+          description: 'General discussion channel',
           is_private: false,
           created_by_id: user.id
         })
         .select()
         .single();
 
-      if (channelError) throw channelError;
+      if (createError) throw createError;
       channel = newChannel;
-      console.log('Created new channel:', channel);
+      console.log('Created #general channel:', channel);
     } else {
-      console.log('Found existing channel:', channel);
+      console.log('Found existing #general channel:', channel);
     }
 
     // Check if user is already a member
-    const { data: existingMember, error: memberCheckError } = await supabase
+    console.log('\nChecking channel membership...');
+    const { data: existingMembership, error: membershipError } = await supabase
       .from('channel_members')
       .select('*')
       .eq('channel_id', channel.id)
       .eq('user_id', user.id)
       .single();
 
-    if (memberCheckError && memberCheckError.code !== 'PGRST116') {
-      throw memberCheckError;
-    }
+    if (membershipError && membershipError.code !== 'PGRST116') throw membershipError;
 
-    if (!existingMember) {
-      // Add user as channel member if not already
-      const { data: member, error: memberError } = await supabase
+    if (!existingMembership) {
+      console.log('Adding user to #general...');
+      const { data: membership, error: addError } = await supabase
         .from('channel_members')
         .insert({
           channel_id: channel.id,
           user_id: user.id,
-          role_in_channel: 'ADMIN'
+          role_in_channel: 'MEMBER'
         })
         .select()
         .single();
 
-      if (memberError) throw memberError;
-      console.log('Added user to channel:', member);
+      if (addError) throw addError;
+      console.log('Added user to #general:', membership);
     } else {
-      console.log('User is already a member:', existingMember);
+      console.log('User is already a member:', existingMembership);
     }
 
-    // Check if welcome message exists
-    const { data: existingMessage, error: messageCheckError } = await supabase
+    // Check for welcome message
+    console.log('\nChecking for welcome message...');
+    const { data: existingMessage, error: messageError } = await supabase
       .from('messages')
       .select('*')
       .eq('channel_id', channel.id)
       .eq('content', 'Welcome to Chat Genius! 👋')
       .single();
 
-    if (messageCheckError && messageCheckError.code !== 'PGRST116') {
-      throw messageCheckError;
-    }
+    if (messageError && messageError.code !== 'PGRST116') throw messageError;
 
     if (!existingMessage) {
-      // Create welcome message only if it doesn't exist
-      const { data: message, error: messageError } = await supabase
+      console.log('Adding welcome message...');
+      const { data: message, error: welcomeError } = await supabase
         .from('messages')
         .insert({
+          content: 'Welcome to Chat Genius! 👋',
           channel_id: channel.id,
-          user_id: user.id,
-          content: 'Welcome to Chat Genius! 👋'
+          user_id: user.id
         })
         .select()
         .single();
 
-      if (messageError) throw messageError;
-      console.log('Created welcome message:', message);
+      if (welcomeError) throw welcomeError;
+      console.log('Added welcome message:', message);
     } else {
       console.log('Welcome message already exists:', existingMessage);
     }
 
-    console.log('\nInitial setup complete! Verifying final state...\n');
-    await verifyData();
+    console.log('\nInitialization completed successfully!');
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in initialization:', error);
     process.exit(1);
   }
 }

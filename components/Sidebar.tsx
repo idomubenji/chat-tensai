@@ -1,31 +1,68 @@
 "use client";
 
+import { useRouter } from 'next/navigation';
+import { useChannels } from '@/hooks/useChannels';
+import { ChannelList } from '@/components/ChannelList';
+import { useAuth, useUser } from '@clerk/nextjs';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import { Button } from "@/components/ui/button";
-import { MessageSquare, Hash } from "lucide-react";
-import { ProfilePicture } from "./ProfilePicture";
-import { SignOutButton } from "./SignOutButton";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-
-// Mock data for channels - you can move this to a proper data source later
-const mockChannels = [
-  { id: "1", name: "general" },
-  { id: "2", name: "random" },
-  { id: "3", name: "project-a" },
-];
+import { Button } from '@/components/ui/button';
+import { MessageSquare } from 'lucide-react';
 
 export function Sidebar() {
   const router = useRouter();
+  const { channels, loading, error, addChannel, deleteChannel } = useChannels();
+  const { userId } = useAuth();
+  const { user } = useUser();
+  const isAdmin = user?.publicMetadata?.role === 'ADMIN';
 
   const handleChannelSelect = (channelId: string) => {
     router.push(`/channels/${channelId}`);
   };
+
+  const handleAddChannel = async (name: string) => {
+    try {
+      await addChannel(name);
+    } catch (error) {
+      console.error('Failed to create channel:', error);
+    }
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    try {
+      await deleteChannel(channelId);
+      // Redirect to #general if the current channel is deleted
+      const currentPath = window.location.pathname;
+      if (currentPath.includes(channelId)) {
+        const generalChannel = channels.find(c => c.name === '#general');
+        if (generalChannel) {
+          router.push(`/channels/${generalChannel.id}`);
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete channel:', error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="w-64 bg-[#6F8FAF] p-4 h-full flex flex-col text-white">
+        <div>Loading channels...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="w-64 bg-[#6F8FAF] p-4 h-full flex flex-col text-white">
+        <div>Error loading channels</div>
+      </div>
+    );
+  }
 
   return (
     <div className="w-64 bg-[#6F8FAF] p-4 h-full flex flex-col text-white">
@@ -35,19 +72,13 @@ export function Sidebar() {
           <AccordionItem value="channels">
             <AccordionTrigger className="hover:text-gray-200">Channels</AccordionTrigger>
             <AccordionContent>
-              <div className="space-y-2">
-                {mockChannels.map((channel) => (
-                  <Button
-                    key={channel.id}
-                    variant="ghost"
-                    className="w-full justify-start text-white hover:text-gray-200 hover:bg-[#5A7593]"
-                    onClick={() => handleChannelSelect(channel.id)}
-                  >
-                    <Hash className="h-4 w-4 mr-2" />
-                    {channel.name}
-                  </Button>
-                ))}
-              </div>
+              <ChannelList
+                channels={channels}
+                onSelectChannel={handleChannelSelect}
+                onAddChannel={handleAddChannel}
+                onDeleteChannel={handleDeleteChannel}
+                isAdmin={isAdmin}
+              />
             </AccordionContent>
           </AccordionItem>
 
@@ -71,12 +102,6 @@ export function Sidebar() {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
-      </div>
-      <div className="mt-auto pt-4 flex items-center justify-between">
-        <Link href="/settings">
-          <ProfilePicture />
-        </Link>
-        <SignOutButton />
       </div>
     </div>
   );

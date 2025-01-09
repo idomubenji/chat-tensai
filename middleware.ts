@@ -2,6 +2,7 @@ import { authMiddleware, clerkClient } from '@clerk/nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { getSupabaseToken } from '@/lib/clerk-supabase';
 
 // Initialize Supabase admin client
 const supabaseAdmin = createClient<Database>(
@@ -27,10 +28,11 @@ async function shouldSyncUser(userId: string): Promise<boolean> {
 
 export default authMiddleware({
   afterAuth: async (auth, req) => {
+    // Create a new response
     const res = NextResponse.next();
 
-    // Only proceed if we have a user and it's time to sync
-    if (auth.userId && await shouldSyncUser(auth.userId)) {
+    // Only proceed if we have a user
+    if (auth.userId) {
       try {
         console.log('\n=== MIDDLEWARE: USER SYNC START ===');
         // Get user details from Clerk
@@ -94,6 +96,13 @@ export default authMiddleware({
         } else {
           console.log('No sync needed - user data unchanged');
         }
+
+        // Get the Supabase token and set it in the response headers
+        const token = await getSupabaseToken();
+        if (token) {
+          res.headers.set('Authorization', `Bearer ${token}`);
+        }
+
         console.log('=== MIDDLEWARE: USER SYNC END ===\n');
       } catch (error) {
         console.error('Error in middleware:', error);

@@ -46,11 +46,11 @@ export async function GET(
         files(*)
       `)
       .eq('channel_id', params.channelId)
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: true })
       .limit(limit);
 
     if (cursor) {
-      query.lt('created_at', cursor);
+      query.gt('created_at', cursor);
     }
 
     const { data: messages, error: messagesError } = await query;

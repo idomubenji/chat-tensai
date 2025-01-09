@@ -24,228 +24,115 @@ EXCEPTION
     WHEN duplicate_object THEN null;
 END $$;
 
--- Drop existing policies first to handle dependencies
-DROP POLICY IF EXISTS "Users are viewable by everyone" ON users;
-DROP POLICY IF EXISTS "Users can update own record" ON users;
-DROP POLICY IF EXISTS "Public channels are viewable by everyone" ON channels;
-DROP POLICY IF EXISTS "Channel members can insert messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can view messages" ON messages;
-DROP POLICY IF EXISTS "Message authors can update their messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can add reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view files" ON files;
+-- Create function to check RLS status
+CREATE OR REPLACE FUNCTION public.check_rls_enabled(table_name text)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1
+    FROM pg_class c
+    JOIN pg_namespace n ON n.oid = c.relnamespace
+    WHERE n.nspname = 'public'
+    AND c.relname = table_name
+    AND c.relrowsecurity = true
+  );
+END;
+$$;
 
--- Drop existing tables if they exist (comment out if you want to preserve data)
-DROP TABLE IF EXISTS files CASCADE;
-DROP TABLE IF EXISTS message_reactions CASCADE;
-DROP TABLE IF EXISTS messages CASCADE;
-DROP TABLE IF EXISTS channel_members CASCADE;
-DROP TABLE IF EXISTS channels CASCADE;
-DROP TABLE IF EXISTS users CASCADE;
-
--- Create users table
-CREATE TABLE IF NOT EXISTS users (
-  id TEXT PRIMARY KEY,
-  email TEXT NOT NULL UNIQUE,
-  name TEXT NOT NULL,
-  avatar_url TEXT,
-  status user_status NOT NULL DEFAULT 'OFFLINE',
-  role user_role NOT NULL DEFAULT 'USER',
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+-- Create tables
+CREATE TABLE IF NOT EXISTS public.users (
+  id text PRIMARY KEY,
+  email text UNIQUE NOT NULL,
+  name text,
+  avatar_url text,
+  status text DEFAULT 'ONLINE'::text,
+  role text DEFAULT 'USER'::text,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create channels table
-CREATE TABLE IF NOT EXISTS channels (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name TEXT NOT NULL UNIQUE,
-  description TEXT,
-  is_private BOOLEAN NOT NULL DEFAULT FALSE,
-  created_by_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS public.channels (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  name text NOT NULL,
+  description text,
+  is_private boolean DEFAULT false,
+  created_by_id text REFERENCES public.users(id) ON DELETE SET NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(name)
 );
 
--- Create channel_members table
-CREATE TABLE IF NOT EXISTS channel_members (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  role_in_channel channel_role NOT NULL DEFAULT 'MEMBER',
-  joined_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+CREATE TABLE IF NOT EXISTS public.channel_members (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  channel_id uuid REFERENCES public.channels(id) ON DELETE CASCADE,
+  user_id text REFERENCES public.users(id) ON DELETE CASCADE,
+  role_in_channel text DEFAULT 'MEMBER'::text,
+  joined_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   UNIQUE(channel_id, user_id)
 );
 
--- Create messages table
-CREATE TABLE IF NOT EXISTS messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  content TEXT NOT NULL,
-  channel_id UUID NOT NULL REFERENCES channels(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  parent_id UUID REFERENCES messages(id) ON DELETE CASCADE,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS public.messages (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  content text NOT NULL,
+  channel_id uuid REFERENCES public.channels(id) ON DELETE CASCADE,
+  user_id text REFERENCES public.users(id) ON DELETE SET NULL,
+  parent_id uuid REFERENCES public.messages(id) ON DELETE CASCADE,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create message_reactions table
-CREATE TABLE IF NOT EXISTS message_reactions (
-  message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  emoji TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (message_id, user_id, emoji)
+CREATE TABLE IF NOT EXISTS public.message_reactions (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  message_id uuid REFERENCES public.messages(id) ON DELETE CASCADE,
+  user_id text REFERENCES public.users(id) ON DELETE CASCADE,
+  emoji text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
+  UNIQUE(message_id, user_id, emoji)
 );
 
--- Create files table
-CREATE TABLE IF NOT EXISTS files (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  url TEXT NOT NULL,
-  message_id UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
-  user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  uploaded_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+CREATE TABLE IF NOT EXISTS public.files (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  message_id uuid REFERENCES public.messages(id) ON DELETE CASCADE,
+  name text NOT NULL,
+  size bigint NOT NULL,
+  type text NOT NULL,
+  url text NOT NULL,
+  created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Create indexes if they don't exist
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON channel_members(channel_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON public.channel_members(user_id);
+CREATE INDEX IF NOT EXISTS idx_channel_members_channel_id ON public.channel_members(channel_id);
+CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON public.messages(channel_id);
+CREATE INDEX IF NOT EXISTS idx_messages_user_id ON public.messages(user_id);
+CREATE INDEX IF NOT EXISTS idx_messages_parent_id ON public.messages(parent_id);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON public.message_reactions(message_id);
+CREATE INDEX IF NOT EXISTS idx_message_reactions_user_id ON public.message_reactions(user_id);
+CREATE INDEX IF NOT EXISTS idx_files_message_id ON public.files(message_id);
 
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_channel_members_user_id ON channel_members(user_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_messages_channel_id ON messages(channel_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_messages_user_id ON messages(user_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_messages_parent_id ON messages(parent_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_message_reactions_message_id ON message_reactions(message_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_message_reactions_user_id ON message_reactions(user_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_files_message_id ON files(message_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
-DO $$ BEGIN
-    CREATE INDEX IF NOT EXISTS idx_files_user_id ON files(user_id);
-EXCEPTION
-    WHEN others THEN null;
-END $$;
-
--- Create updated_at triggers
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- Create triggers for updated_at
+CREATE OR REPLACE FUNCTION public.handle_updated_at()
 RETURNS TRIGGER AS $$
 BEGIN
-    NEW.updated_at = NOW();
-    RETURN NEW;
+  NEW.updated_at = timezone('utc'::text, now());
+  RETURN NEW;
 END;
 $$ language 'plpgsql';
 
--- Drop and recreate triggers to avoid duplicates
-DROP TRIGGER IF EXISTS update_users_updated_at ON users;
-CREATE TRIGGER update_users_updated_at
-    BEFORE UPDATE ON users
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER users_updated_at
+  BEFORE UPDATE ON public.users
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.handle_updated_at();
 
-DROP TRIGGER IF EXISTS update_channels_updated_at ON channels;
-CREATE TRIGGER update_channels_updated_at
-    BEFORE UPDATE ON channels
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
+CREATE TRIGGER channels_updated_at
+  BEFORE UPDATE ON public.channels
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.handle_updated_at();
 
-DROP TRIGGER IF EXISTS update_messages_updated_at ON messages;
-CREATE TRIGGER update_messages_updated_at
-    BEFORE UPDATE ON messages
-    FOR EACH ROW
-    EXECUTE FUNCTION update_updated_at_column();
-
--- Set up Row Level Security (RLS)
-ALTER TABLE users ENABLE ROW LEVEL SECURITY;
-ALTER TABLE channels ENABLE ROW LEVEL SECURITY;
-ALTER TABLE channel_members ENABLE ROW LEVEL SECURITY;
-ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
-ALTER TABLE message_reactions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE files ENABLE ROW LEVEL SECURITY;
-
--- RLS Policies
--- Users can read all users
-CREATE POLICY "Users are viewable by everyone" ON users
-  FOR SELECT USING (true);
-
--- Users can update their own record
-CREATE POLICY "Users can update own record" ON users
-  FOR UPDATE USING (auth.uid()::text = id);
-
--- Channels policies
-CREATE POLICY "Public channels are viewable by everyone" ON channels
-  FOR SELECT USING (NOT is_private OR EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = id AND user_id = auth.uid()::text
-  ));
-
-CREATE POLICY "Channel members can insert messages" ON messages
-  FOR INSERT WITH CHECK (EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()::text
-  ));
-
--- Messages are viewable by channel members
-CREATE POLICY "Channel members can view messages" ON messages
-  FOR SELECT USING (EXISTS (
-    SELECT 1 FROM channel_members WHERE channel_id = messages.channel_id AND user_id = auth.uid()::text
-  ));
-
--- Message authors can update their messages
-CREATE POLICY "Message authors can update their messages" ON messages
-  FOR UPDATE USING (auth.uid()::text = user_id);
-
--- Channel members can add reactions
-CREATE POLICY "Channel members can add reactions" ON message_reactions
-  FOR INSERT WITH CHECK (EXISTS (
-    SELECT 1 FROM messages m
-    JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
-  ));
-
--- Channel members can view reactions
-CREATE POLICY "Channel members can view reactions" ON message_reactions
-  FOR SELECT USING (EXISTS (
-    SELECT 1 FROM messages m
-    JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
-  ));
-
--- Files policies similar to messages
-CREATE POLICY "Channel members can view files" ON files
-  FOR SELECT USING (EXISTS (
-    SELECT 1 FROM messages m
-    JOIN channel_members cm ON m.channel_id = cm.channel_id
-    WHERE m.id = message_id AND cm.user_id = auth.uid()::text
-  )); 
+CREATE TRIGGER messages_updated_at
+  BEFORE UPDATE ON public.messages
+  FOR EACH ROW
+  EXECUTE PROCEDURE public.handle_updated_at(); 
