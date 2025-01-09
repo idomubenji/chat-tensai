@@ -20,8 +20,29 @@ export function Sidebar() {
   const { user } = useUser();
   const isAdmin = user?.publicMetadata?.role === 'ADMIN';
 
-  const handleChannelSelect = (channelId: string) => {
-    router.push(`/channels/${channelId}`);
+  const handleChannelSelect = async (channelId: string) => {
+    console.log('=== Channel Selection Start ===');
+    console.log('Selected channel ID:', channelId);
+    console.log('Available channels:', channels);
+    
+    try {
+      const selectedChannel = channels.find(c => c.id === channelId);
+      if (selectedChannel) {
+        console.log('Found selected channel:', selectedChannel);
+        await router.replace(`/channels/${channelId}`, { scroll: false });
+      } else {
+        console.error('Selected channel not found in available channels');
+        const generalChannel = channels.find(c => c.name === 'general');
+        if (generalChannel) {
+          console.log('Redirecting to general channel:', generalChannel.id);
+          await router.replace(`/channels/${generalChannel.id}`, { scroll: false });
+        }
+      }
+    } catch (error) {
+      console.error('Error navigating to channel:', error);
+    }
+    
+    console.log('=== Channel Selection End ===');
   };
 
   const handleAddChannel = async (name: string) => {
@@ -35,12 +56,12 @@ export function Sidebar() {
   const handleDeleteChannel = async (channelId: string) => {
     try {
       await deleteChannel(channelId);
-      // Redirect to #general if the current channel is deleted
+      // Redirect to general if the current channel is deleted
       const currentPath = window.location.pathname;
       if (currentPath.includes(channelId)) {
-        const generalChannel = channels.find(c => c.name === '#general');
+        const generalChannel = channels.find(c => c.name === 'general');
         if (generalChannel) {
-          router.push(`/channels/${generalChannel.id}`);
+          router.replace(`/channels/${generalChannel.id}`);
         }
       }
     } catch (error) {

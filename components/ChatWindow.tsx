@@ -204,7 +204,7 @@ export function ChatWindow({
                         "rounded-lg px-4 py-2 text-sm break-words",
                         isCurrentUser
                           ? "bg-pink-200 text-gray-900"
-                          : "bg-white text-gray-900"
+                          : "bg-[#223344] text-white"
                       )}
                     >
                       {message.content}

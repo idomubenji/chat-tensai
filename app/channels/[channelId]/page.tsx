@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils";
 import { ThreadWindow } from "@/components/ThreadWindow";
 import { useChannels } from "@/hooks/useChannels";
 import type { Database } from '@/types/supabase';
+import { Sidebar } from "@/components/Sidebar";
 
 type Message = {
   id: string;
@@ -38,11 +39,17 @@ export default function ChannelPage({
   const router = useRouter();
   const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
 
-  const fetchMessages = useCallback(async () => {
-    if (!userId) return; // Don't fetch if not authenticated
+  const fetchMessagesForChannel = useCallback(async (channelId: string) => {
+    if (!userId) return;
     try {
       const response = await fetch(
-        `/api/channels/${params.channelId}/messages`
+        `/api/channels/${channelId}/messages`,
+        {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
       );
       if (!response.ok) throw new Error("Failed to fetch messages");
       const data = await response.json();
@@ -52,7 +59,7 @@ export default function ChannelPage({
     } finally {
       setLoading(false);
     }
-  }, [userId, params.channelId]);
+  }, [userId]);
 
   // Handle authentication
   useEffect(() => {
@@ -61,19 +68,34 @@ export default function ChannelPage({
     }
   }, [isLoaded, userId, router]);
 
-  // Handle message fetching
+  // Handle channel redirection and message fetching
   useEffect(() => {
-    if (userId) {
-      fetchMessages();
-    }
-  }, [userId, fetchMessages]);
+    const handleChannelSetup = async () => {
+      if (!channelsLoading && userId && channels.length > 0) {
+        console.log('=== Channel Setup Start ===');
+        console.log('Current channel ID:', params.channelId);
+        console.log('Available channels:', channels);
+        
+        const currentChannel = channels.find(c => c.id === params.channelId);
+        const generalChannel = channels.find(c => c.name === 'general');
+        
+        console.log('Current channel:', currentChannel);
+        console.log('General channel:', generalChannel);
 
-  // Handle channel not found
-  useEffect(() => {
-    if (!channelsLoading && !channel && userId) {
-      router.push('/');
-    }
-  }, [channelsLoading, channel, router, userId]);
+        if (!currentChannel && generalChannel) {
+          console.log('Channel not found, redirecting to general channel:', generalChannel.id);
+          await router.replace(`/channels/${generalChannel.id}`, { scroll: false });
+        } else if (currentChannel) {
+          console.log('Fetching messages for current channel');
+          await fetchMessagesForChannel(currentChannel.id);
+        }
+        
+        console.log('=== Channel Setup End ===');
+      }
+    };
+
+    handleChannelSetup();
+  }, [channelsLoading, userId, channels, params.channelId, router, fetchMessagesForChannel]);
 
   const handleMessageSent = async (content: string) => {
     if (!userId) return; // Don't send if not authenticated
@@ -156,13 +178,14 @@ export default function ChannelPage({
 
   return (
     <div className="flex h-full">
+      <Sidebar />
       <div className={cn(
-        "flex flex-col h-full",
+        "flex flex-col h-full flex-1",
         selectedMessage ? "w-[calc(100%-400px)]" : "w-full"
       )}>
         <div className="p-4 border-b bg-[#445566] text-white">
           <h1 className="text-2xl font-bold">
-            #{channel.name}
+            {channel.name.startsWith('#') ? channel.name : `#${channel.name}`}
           </h1>
           {channel.description && (
             <p className="text-sm text-gray-300">{channel.description}</p>

@@ -4,10 +4,10 @@ import type { Database } from '@/types/supabase';
 
 dotenv.config();
 
-// Initialize Supabase admin client
+// Initialize Supabase client
 const supabase = createClient<Database>(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
   {
     auth: {
       autoRefreshToken: false,
@@ -34,72 +34,97 @@ async function main() {
     const user = users[0];
     console.log('Selected user:', user);
 
-    // Check for #general channel
-    console.log('\nChecking for #general channel...');
-    const { data: existingChannel, error: channelError } = await supabase
+    // Check for existing general channel
+    const { data: existingChannels, error: channelError } = await supabase
       .from('channels')
       .select('*')
-      .eq('name', '#general')
-      .single();
+      .or('name.eq.general,name.eq.#general');
 
-    if (channelError && channelError.code !== 'PGRST116') throw channelError;
+    if (channelError) {
+      console.error('Error checking for existing channel:', channelError);
+      return;
+    }
 
-    let channel = existingChannel;
-    if (!channel) {
-      console.log('Creating #general channel...');
+    let generalChannelId = '';
+
+    if (existingChannels.length > 0) {
+      // Use the existing channel
+      const generalChannel = existingChannels[0];
+      generalChannelId = generalChannel.id;
+      
+      // Update the name if needed
+      if (generalChannel.name !== 'general') {
+        const { error: updateError } = await supabase
+          .from('channels')
+          .update({ name: 'general' })
+          .eq('id', generalChannelId);
+        
+        if (updateError) {
+          console.error('Error updating channel name:', updateError);
+          return;
+        }
+      }
+    } else {
+      // Create new general channel
       const { data: newChannel, error: createError } = await supabase
         .from('channels')
-        .insert({
-          name: '#general',
-          description: 'General discussion channel',
-          is_private: false,
-          created_by_id: user.id
-        })
+        .insert([
+          {
+            name: 'general',
+            description: 'General discussion',
+            created_by_id: user.id,
+          },
+        ])
         .select()
         .single();
 
-      if (createError) throw createError;
-      channel = newChannel;
-      console.log('Created #general channel:', channel);
-    } else {
-      console.log('Found existing #general channel:', channel);
+      if (createError) {
+        console.error('Error creating channel:', createError);
+        return;
+      }
+
+      generalChannelId = newChannel.id;
     }
 
     // Check if user is already a member
-    console.log('\nChecking channel membership...');
     const { data: existingMembership, error: membershipError } = await supabase
       .from('channel_members')
       .select('*')
-      .eq('channel_id', channel.id)
+      .eq('channel_id', generalChannelId)
       .eq('user_id', user.id)
       .single();
 
-    if (membershipError && membershipError.code !== 'PGRST116') throw membershipError;
-
-    if (!existingMembership) {
-      console.log('Adding user to #general...');
-      const { data: membership, error: addError } = await supabase
-        .from('channel_members')
-        .insert({
-          channel_id: channel.id,
-          user_id: user.id,
-          role_in_channel: 'MEMBER'
-        })
-        .select()
-        .single();
-
-      if (addError) throw addError;
-      console.log('Added user to #general:', membership);
-    } else {
-      console.log('User is already a member:', existingMembership);
+    if (membershipError && membershipError.code !== 'PGRST116') {
+      console.error('Error checking membership:', membershipError);
+      return;
     }
+
+    // Add user to channel if not already a member
+    if (!existingMembership) {
+      const { error: addError } = await supabase
+        .from('channel_members')
+        .insert([
+          {
+            channel_id: generalChannelId,
+            user_id: user.id,
+            role_in_channel: 'ADMIN',
+          },
+        ]);
+
+      if (addError) {
+        console.error('Error adding user to channel:', addError);
+        return;
+      }
+    }
+
+    console.log('General channel ID:', generalChannelId);
 
     // Check for welcome message
     console.log('\nChecking for welcome message...');
     const { data: existingMessage, error: messageError } = await supabase
       .from('messages')
       .select('*')
-      .eq('channel_id', channel.id)
+      .eq('channel_id', generalChannelId)
       .eq('content', 'Welcome to Chat Genius! 👋')
       .single();
 
@@ -111,7 +136,7 @@ async function main() {
         .from('messages')
         .insert({
           content: 'Welcome to Chat Genius! 👋',
-          channel_id: channel.id,
+          channel_id: generalChannelId,
           user_id: user.id
         })
         .select()
