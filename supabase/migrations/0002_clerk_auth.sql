@@ -1,7 +1,8 @@
 -- Enable Clerk authentication
 DROP FUNCTION IF EXISTS auth.uid();
+DROP FUNCTION IF EXISTS public.auth_uid();
 
-CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+CREATE OR REPLACE FUNCTION public.auth_uid() RETURNS text AS $$
 DECLARE
   claims json;
   debug_info text;
@@ -18,29 +19,31 @@ BEGIN
   EXCEPTION
     WHEN OTHERS THEN
       RAISE NOTICE 'Error parsing JWT claims: %, Headers: %', SQLERRM, headers;
-      -- For testing, return a default user ID if claims parsing fails
-      RETURN 'user_2rHRLTqeMXttalVXfblCIcF47FU';
+      RETURN NULL;
   END;
   
   -- Build debug info
   debug_info := format(
-    'JWT Claims - raw: %s, headers: %s, userId: %s, sub: %s, role: %s',
+    'JWT Claims - raw: %s, headers: %s, userId: %s, sub: %s',
     current_setting('request.jwt.claims', true),
     headers,
     claims->>'userId',
-    claims->>'sub',
-    claims->>'role'
+    claims->>'sub'
   );
   
   -- Log the debug info
   RAISE NOTICE '%', debug_info;
 
-  -- For testing, always return the default user ID
-  RETURN 'user_2rHRLTqeMXttalVXfblCIcF47FU';
+  -- Return the actual user ID from claims
+  RETURN claims->>'userId';
 EXCEPTION
   WHEN OTHERS THEN
-    RAISE NOTICE 'Error in auth.uid(): %, Headers: %', SQLERRM, headers;
-    -- For testing, return a default user ID if anything fails
-    RETURN 'user_2rHRLTqeMXttalVXfblCIcF47FU';
+    RAISE NOTICE 'Error in auth_uid(): %, Headers: %', SQLERRM, headers;
+    RETURN NULL;
 END;
-$$ LANGUAGE plpgsql STABLE; 
+$$ LANGUAGE plpgsql STABLE SECURITY DEFINER;
+
+-- Create an alias in the auth schema that points to our public function
+CREATE OR REPLACE FUNCTION auth.uid() RETURNS text AS $$
+  SELECT public.auth_uid();
+$$ LANGUAGE sql STABLE; 

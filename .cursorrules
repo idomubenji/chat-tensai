@@ -16,7 +16,16 @@
       "requireDocstrings": true
     },
     "commentStyle": "Explain intent and reasoning.",
-    "errorHandling": "Include explicit error types in try-catch blocks."
+    "errorHandling": "Include explicit error types in try-catch blocks.",
+    "uiConsistency": {
+      "rule": "No UI changes during structural or logic updates. Visible components, UX patterns, CSS, etc. should all stay the same unless they are explicitly requested to change. We must be consistent in our design patterns (e.g. same fonts, similar styling, consistent padding and margins, etc.)",
+      "enforceDesignSystem": true
+    },
+    "environments": {
+      "rule": "We have a development environment and a production environment. Please Announce which environment you are adding to at the beginning of your responses. Do not add or remove anything in one environment that will break the other environment",
+      "requireEnvironmentAnnouncement": true,
+      "enforceEnvironmentParity": true
+    }
   },
   "taskSpecificRules": {
     "codeGeneration": {

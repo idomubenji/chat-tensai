@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import type { Database } from '@/types/supabase';
-import { useSupabaseClient } from '@/lib/supabase-auth';
 import { useAuth } from '@clerk/nextjs';
 
 type Channel = Database['public']['Tables']['channels']['Row'];
@@ -9,64 +8,28 @@ export function useChannels() {
   const [channels, setChannels] = useState<Channel[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const supabase = useSupabaseClient();
-  const { userId, getToken } = useAuth();
+  const { userId } = useAuth();
 
   useEffect(() => {
     async function fetchChannels() {
       try {
-        console.log('Fetching channels for user:', userId);
+        console.log('=== DEBUG: FETCH CHANNELS START ===');
+        console.log('Authenticated user ID:', userId);
+        
         if (!userId) {
           throw new Error('Not authenticated');
         }
 
-        // Get the token for debugging
-        const token = await getToken({ template: 'supabase' });
-        console.log('Using token:', token ? token.substring(0, 20) + '...' : 'No token');
-
-        // First get the user's channel memberships
-        console.log('Fetching channel memberships...');
-        console.log('Query params:', { user_id: userId });
-        const { data: memberships, error: membershipError, count } = await supabase
-          .from('channel_members')
-          .select('channel_id', { count: 'exact' })
-          .eq('user_id', userId)
-          .order('joined_at', { ascending: true });
-
-        if (membershipError) {
-          console.error('Error fetching memberships:', membershipError);
-          throw membershipError;
+        // Fetch channels from our API endpoint
+        const response = await fetch('/api/channels');
+        if (!response.ok) {
+          throw new Error(`Error fetching channels: ${response.statusText}`);
         }
 
-        console.log('Channel memberships query result:', {
-          memberships,
-          count,
-          error: membershipError
-        });
-
-        if (!memberships || memberships.length === 0) {
-          console.log('No channel memberships found');
-          setChannels([]);
-          return;
-        }
-
-        // Then fetch the channels the user is a member of
-        console.log('Fetching channels...');
-        const channelIds = memberships.map(m => m.channel_id);
-        console.log('Channel IDs:', channelIds);
-        const { data, error: fetchError } = await supabase
-          .from('channels')
-          .select('*')
-          .in('id', channelIds)
-          .order('created_at', { ascending: true });
-
-        if (fetchError) {
-          console.error('Error fetching channels:', fetchError);
-          throw fetchError;
-        }
-
+        const data = await response.json();
         console.log('Channels fetched:', data);
         setChannels(data || []);
+        console.log('=== DEBUG: FETCH CHANNELS END ===');
       } catch (err) {
         console.error('Error in fetchChannels:', err);
         setError(err instanceof Error ? err : new Error('Failed to fetch channels'));
@@ -77,93 +40,36 @@ export function useChannels() {
 
     if (userId) {
       fetchChannels();
-
-      // Subscribe to channel changes
-      console.log('Setting up channel changes subscription...');
-      const channelsSubscription = supabase
-        .channel('channels-changes')
-        .on('postgres_changes', 
-          { 
-            event: '*', 
-            schema: 'public', 
-            table: 'channels' 
-          }, 
-          (payload) => {
-            console.log('Channel change detected:', payload);
-            fetchChannels();
-          }
-        )
-        .subscribe();
-
-      // Also subscribe to channel membership changes
-      console.log('Setting up membership changes subscription...');
-      const membershipSubscription = supabase
-        .channel('membership-changes')
-        .on('postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'channel_members'
-          },
-          (payload) => {
-            console.log('Membership change detected:', payload);
-            fetchChannels();
-          }
-        )
-        .subscribe();
-
-      return () => {
-        console.log('Cleaning up subscriptions...');
-        channelsSubscription.unsubscribe();
-        membershipSubscription.unsubscribe();
-      };
     } else {
       console.log('No userId, skipping channel fetch');
       setLoading(false);
       setChannels([]);
     }
-  }, [supabase, userId, getToken]);
+  }, [userId]);
 
   const addChannel = async (name: string) => {
     try {
       console.log('Adding new channel:', name);
       if (!userId) throw new Error('Not authenticated');
 
-      const { data: channel, error: createError } = await supabase
-        .from('channels')
-        .insert([
-          {
-            name,
-            description: '',
-            is_private: false,
-            created_by_id: userId
-          }
-        ])
-        .select()
-        .single();
+      const response = await fetch('/api/channels', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name,
+          description: '',
+          is_private: false
+        })
+      });
 
-      if (createError) {
-        console.error('Error creating channel:', createError);
-        throw createError;
+      if (!response.ok) {
+        throw new Error(`Error creating channel: ${response.statusText}`);
       }
 
+      const channel = await response.json();
       console.log('Channel created:', channel);
-
-      // Add the creator as a member
-      const { error: memberError } = await supabase
-        .from('channel_members')
-        .insert({
-          channel_id: channel.id,
-          user_id: userId,
-          role_in_channel: 'ADMIN'
-        });
-
-      if (memberError) {
-        console.error('Error adding member:', memberError);
-        throw memberError;
-      }
-
-      console.log('Creator added as channel member');
       return channel;
     } catch (err) {
       console.error('Error in addChannel:', err);
@@ -176,14 +82,12 @@ export function useChannels() {
       console.log('Deleting channel:', channelId);
       if (!userId) throw new Error('Not authenticated');
 
-      const { error: deleteError } = await supabase
-        .from('channels')
-        .delete()
-        .eq('id', channelId);
+      const response = await fetch(`/api/channels/${channelId}`, {
+        method: 'DELETE'
+      });
 
-      if (deleteError) {
-        console.error('Error deleting channel:', deleteError);
-        throw deleteError;
+      if (!response.ok) {
+        throw new Error(`Error deleting channel: ${response.statusText}`);
       }
 
       console.log('Channel deleted successfully');

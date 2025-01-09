@@ -1,14 +1,11 @@
 import { authMiddleware, clerkClient } from '@clerk/nextjs';
-import { createClient } from '@supabase/supabase-js';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { createSupabaseAdminClient } from '@/lib/supabase';
 import { getSupabaseToken } from '@/lib/clerk-supabase';
 
-// Initialize Supabase admin client
-const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+// Initialize Supabase admin client using our environment-aware helper
+const supabaseAdmin = createSupabaseAdminClient();
 
 // Cache to store last sync time for each user
 const userSyncCache = new Map<string, number>();
@@ -58,7 +55,8 @@ export default authMiddleware({
             oldEmail: existingUser?.email,
             newEmail,
             oldName: existingUser?.name,
-            newName
+            newName,
+            environment: process.env.NODE_ENV
           });
 
           // Upsert user into Supabase
@@ -84,13 +82,15 @@ export default authMiddleware({
               userId: user.id,
               errorCode: error.code,
               errorMessage: error.message,
-              details: error.details
+              details: error.details,
+              environment: process.env.NODE_ENV
             });
           } else {
             console.log('User upserted successfully:', {
               userId: data.id,
               email: data.email,
-              name: data.name
+              name: data.name,
+              environment: process.env.NODE_ENV
             });
           }
         } else {
@@ -103,7 +103,7 @@ export default authMiddleware({
           res.headers.set('Authorization', `Bearer ${token}`);
         }
 
-        console.log('=== MIDDLEWARE: USER SYNC END ===\n');
+        console.log('=== MIDDLEWARE: USER SYNC END ===');
       } catch (error) {
         console.error('Error in middleware:', error);
       }
