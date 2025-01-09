@@ -24,7 +24,8 @@
     "environments": {
       "rule": "We have a development environment and a production environment. Please Announce which environment you are adding to at the beginning of your responses. Do not add or remove anything in one environment that will break the other environment",
       "requireEnvironmentAnnouncement": true,
-      "enforceEnvironmentParity": true
+      "enforceEnvironmentParity": true,
+      "documentation": "For detailed environment setup and management, refer to docs/chat-tensai-obsidian/RLS-and-Environment-Setup.md"
     }
   },
   "taskSpecificRules": {
