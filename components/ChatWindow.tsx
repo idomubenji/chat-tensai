@@ -9,6 +9,8 @@ import { MessageReplyButton } from "./MessageReplyButton";
 import { ThreadWindow } from "./ThreadWindow";
 import { LoadingBall } from "./LoadingBall";
 import { UserName } from "./UserName";
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { Database } from "@/types/supabase";
 
 type Message = {
   id: string;
@@ -73,6 +75,21 @@ export function ChatWindow({
     e.preventDefault();
     if (!newMessage.trim()) return;
 
+    // Create optimistic message
+    const optimisticMessage: Message = {
+      id: `temp-${Date.now()}`,
+      content: newMessage,
+      userId: userId || '',
+      userName: 'You', // This will be updated when we fetch
+      createdAt: new Date().toISOString(),
+      reactions: {},
+      replies: []
+    };
+
+    // Add optimistic message immediately
+    setMessages(prev => [...prev, optimisticMessage]);
+    setNewMessage(""); // Clear input after sending
+
     try {
       const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'POST',
@@ -85,10 +102,11 @@ export function ChatWindow({
       if (!response.ok) {
         throw new Error('Failed to send message');
       }
-
-      setNewMessage(""); // Clear input after sending
+      // Real message will come through the subscription
     } catch (error) {
       console.error('Error sending message:', error);
+      // Remove optimistic message on error
+      setMessages(prev => prev.filter(msg => msg.id !== optimisticMessage.id));
     }
   };
 
@@ -190,10 +208,62 @@ export function ChatWindow({
     fetchMessages();
 
     // Set up real-time subscription
-    // TODO: Implement Supabase real-time subscription for messages
+    const supabase = createClientComponentClient<Database>();
+    const subscription = supabase
+      .channel(`messages:${channelId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
+        },
+        async () => {
+          // Don't show loading state for real-time updates
+          try {
+            const response = await fetch(`/api/channels/${channelId}/messages`);
+            if (!response.ok) {
+              throw new Error('Failed to fetch messages');
+            }
+            const messages = await response.json();
+            
+            const transformedMessages = messages.map((msg: any) => ({
+              id: msg.id,
+              content: msg.content,
+              userId: msg.user_id,
+              userName: msg.user?.name || 'Unknown User',
+              userRole: msg.user?.role,
+              createdAt: msg.created_at,
+              reactions: (msg.reactions || []).reduce((acc: any, reaction: any) => {
+                if (!acc[reaction.emoji]) {
+                  acc[reaction.emoji] = {
+                    emoji: reaction.emoji,
+                    userIds: []
+                  };
+                }
+                acc[reaction.emoji].userIds.push(reaction.user_id);
+                return acc;
+              }, {}),
+              replies: []
+            }));
+
+            // Remove any optimistic messages when setting new messages
+            setMessages(transformedMessages);
+          } catch (error) {
+            console.error('Error fetching messages:', error);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
   }, [channelId]);
 
-  if (isLoading || isTransitioning) {
+  // Only show loading state when switching channels
+  if (isLoading && messages.length === 0) {
     return (
       <div className="flex items-center justify-center h-full bg-[#F5E6D3]">
         <div className={cn(

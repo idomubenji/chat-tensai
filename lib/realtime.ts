@@ -32,8 +32,8 @@ export class RealtimeSubscription {
         {
           event: '*',
           schema: 'public',
-          table: 'Message',
-          filter: `channelId=eq.${channelId}`,
+          table: 'messages',
+          filter: `channel_id=eq.${channelId}`,
         },
         callback
       )
@@ -47,7 +47,7 @@ export class RealtimeSubscription {
         {
           event: 'UPDATE',
           schema: 'public',
-          table: 'User',
+          table: 'users',
           filter: 'status=eq.ONLINE',
         },
         callback
