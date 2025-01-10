@@ -31,27 +31,38 @@ jobs:
       
       - name: Create env file
         run: |
-          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> .env.production
-          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> .env.production
-          echo "PRODUCTION_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> .env.production
-          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> .env.production
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> .env.production
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> .env.production
-          echo "NODE_OPTIONS=--max_old_space_size=4096" >> .env.production
-          echo "NEXT_DISABLE_ESLINT=1" >> .env.production
-          echo "NEXT_DISABLE_TYPE_CHECKS=1" >> .env.production
-          cat .env.production
+          # Create env file in workspace directory
+          touch $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "PRODUCTION_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> $GITHUB_WORKSPACE/.env.production
+          echo "NODE_OPTIONS=--max_old_space_size=4096" >> $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_DISABLE_ESLINT=1" >> $GITHUB_WORKSPACE/.env.production
+          echo "NEXT_DISABLE_TYPE_CHECKS=1" >> $GITHUB_WORKSPACE/.env.production
+          
+          # Debug: Show file contents and location
+          echo "Environment file contents:"
+          cat $GITHUB_WORKSPACE/.env.production
+          echo "File location:"
+          ls -la $GITHUB_WORKSPACE/.env.production
           
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ec2-user
         run: |
+          # Debug: Show current directory and files
+          pwd
+          ls -la
+          
           # Copy deployment scripts
           scp -i ~/.ssh/deploy_key scripts/setup-ec2.sh scripts/deploy.sh $EC2_USER@$EC2_HOST:~
           
           # Copy environment file from workspace
-          scp -i ~/.ssh/deploy_key .env.production $EC2_USER@$EC2_HOST:~
+          scp -i ~/.ssh/deploy_key $GITHUB_WORKSPACE/.env.production $EC2_USER@$EC2_HOST:~/.env.production
           
           # Run setup if not already done
           ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
@@ -71,6 +82,11 @@ jobs:
             else
               git clone ${{ secrets.REPO_URL }} .
             fi
+            
+            # Debug: Show environment file
+            echo "Environment file contents on EC2:"
+            ls -la ~/.env.production
+            cat ~/.env.production
             
             # Copy env file and ensure it's loaded
             cp ~/.env.production .env.production
