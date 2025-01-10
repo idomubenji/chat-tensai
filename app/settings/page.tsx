@@ -93,8 +93,10 @@ export default function SettingsPage() {
         throw new Error('Failed to update user settings');
       }
 
+      const updatedData = await response.json();
+      
       // Trigger revalidation of the user data
-      await mutate(USER_DATA_KEY);
+      await mutate(USER_DATA_KEY, updatedData, false);
       
       toast({
         title: 'Settings saved!',

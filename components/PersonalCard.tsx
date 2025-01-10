@@ -11,7 +11,9 @@ interface PersonalCardProps {
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch user data');
-  return res.json();
+  const data = await res.json();
+  console.log('Fetched user data:', data);
+  return data;
 };
 
 // Key for the user data SWR cache
@@ -22,8 +24,8 @@ export function PersonalCard({ className }: PersonalCardProps) {
   const { data: userData, error } = useSWR(USER_DATA_KEY, fetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
-    refreshInterval: 30000, // Refresh every 30 seconds
-    dedupingInterval: 2000, // Only make one request per 2 seconds
+    refreshInterval: 30000,
+    dedupingInterval: 2000,
     revalidateOnMount: true,
     refreshWhenHidden: true,
     refreshWhenOffline: true,
@@ -31,9 +33,15 @@ export function PersonalCard({ className }: PersonalCardProps) {
 
   if (!user) return null;
 
+  const hasStatus = userData?.status_message || userData?.status_emoji;
+  console.log('Status data:', {
+    userData,
+    hasStatus
+  });
+
   return (
-    <div className="bg-[#0A1A3B] rounded-2xl p-8 flex items-center gap-8 min-h-[240px]">
-      <div className="h-[192px] w-[192px] flex-shrink-0">
+    <div className="bg-[#0A1A3B] rounded-2xl p-6 flex items-center gap-6 min-h-[192px]">
+      <div className="relative h-[154px] w-[154px] flex-shrink-0">
         <ProfilePicture 
           size="large" 
           avatarUrl={userData?.avatar_url} 
@@ -41,26 +49,26 @@ export function PersonalCard({ className }: PersonalCardProps) {
           borderColor="white"
           borderWidth="thick"
         />
+        {hasStatus && (
+          <div className="absolute left-0 top-0 bg-gray-100/80 backdrop-blur-sm rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-gray-800 text-sm border border-gray-200 shadow-lg z-10">
+            {userData?.status_emoji && (
+              <span className="text-base">{userData.status_emoji}</span>
+            )}
+            {userData?.status_message && (
+              <span className="max-w-[108px] truncate">{userData.status_message}</span>
+            )}
+          </div>
+        )}
       </div>
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
         <UserName 
           name={user.user_metadata?.username || user.email || 'Anonymous'} 
           userId={user.id} 
           role={user.user_metadata?.role}
-          className="text-3xl font-bold text-gray-100"
+          className="text-2xl font-bold text-gray-100"
         />
         {userData?.bio && (
-          <p className="text-gray-300 text-lg">{userData.bio}</p>
-        )}
-        {(user.user_metadata?.status_message || user.user_metadata?.status_emoji) && (
-          <div className="flex items-center gap-2 text-gray-300 text-lg">
-            {user.user_metadata?.status_emoji && (
-              <span className="text-2xl">{user.user_metadata.status_emoji}</span>
-            )}
-            {user.user_metadata?.status_message && (
-              <span>{user.user_metadata.status_message}</span>
-            )}
-          </div>
+          <p className="text-gray-300 text-base">{userData.bio}</p>
         )}
       </div>
     </div>
