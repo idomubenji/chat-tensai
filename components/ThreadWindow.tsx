@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, X } from "lucide-react";
@@ -6,6 +6,9 @@ import { MessageReactions } from "./MessageReactions";
 import { cn } from "@/lib/utils";
 import { UserName } from "./UserName";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useReactionSubscription } from '@/hooks/useReactionSubscription';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { Database } from '@/types/supabase';
 
 type Message = {
   id: string;
@@ -144,6 +147,83 @@ export function ThreadWindow({
     }
   };
 
+  const handleReactionUpdate = useCallback((targetMessageId: string, newReactions: Message['reactions']) => {
+    if (targetMessageId === messageId && parentMessage) {
+      setParentMessage({ ...parentMessage, reactions: newReactions });
+    } else {
+      setReplies(prevReplies => 
+        prevReplies.map(reply => 
+          reply.id === targetMessageId
+            ? { ...reply, reactions: newReactions }
+            : reply
+        )
+      );
+    }
+  }, [messageId, parentMessage]);
+
+  // Subscribe to reactions for parent message and replies
+  useEffect(() => {
+    const supabase = createClientComponentClient<Database>();
+    const messageIds = parentMessage ? [parentMessage.id, ...replies.map(reply => reply.id)] : [];
+    const channels = messageIds.map(messageId => 
+      supabase
+        .channel(`message-reactions-${messageId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'message_reactions',
+            filter: `message_id=eq.${messageId}`
+          },
+          async () => {
+            // Fetch all reactions for this message
+            const { data: reactions } = await supabase
+              .from('message_reactions')
+              .select(`
+                *,
+                user:users(*)
+              `)
+              .eq('message_id', messageId);
+
+            if (!reactions) return;
+
+            // Transform reactions into the expected format
+            const formattedReactions = reactions.reduce((acc: {
+              [key: string]: {
+                emoji: string;
+                userIds: string[];
+                users: { name: string }[];
+              };
+            }, reaction: any) => {
+              const { emoji, user } = reaction;
+              if (!acc[emoji]) {
+                acc[emoji] = {
+                  emoji,
+                  userIds: [],
+                  users: []
+                };
+              }
+              acc[emoji].userIds.push(reaction.user_id);
+              if (user) {
+                acc[emoji].users.push({ name: user.name });
+              }
+              return acc;
+            }, {});
+
+            handleReactionUpdate(messageId, formattedReactions);
+          }
+        )
+        .subscribe()
+    );
+
+    return () => {
+      channels.forEach(channel => {
+        supabase.removeChannel(channel);
+      });
+    };
+  }, [parentMessage, replies, handleReactionUpdate]);
+
   const renderMessage = (message: Message, isParent: boolean = false) => {
     const isCurrentUser = message.userId === userId;
 
@@ -190,6 +270,7 @@ export function ThreadWindow({
                   currentUserId={userId || ''}
                   onReactionSelect={handleReactionSelect}
                   align="start"
+                  reactions={message.reactions}
                 />
               )}
               <div
@@ -212,6 +293,7 @@ export function ThreadWindow({
                   currentUserId={userId || ''}
                   onReactionSelect={handleReactionSelect}
                   align="end"
+                  reactions={message.reactions}
                 />
               )}
             </div>

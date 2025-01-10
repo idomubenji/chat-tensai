@@ -34,6 +34,20 @@
         "checkMigrationOrder": true,
         "prioritizeRecentMigrations": true
       }
+    },
+    "databaseNaming": {
+      "rule": "Always use 'name' for user names, never 'username'. This is a strict requirement across the entire codebase including database schema, TypeScript types, and API endpoints.",
+      "enforceNamingConventions": true,
+      "fieldMappings": {
+        "users": {
+          "name": "The user's name field - never use username",
+          "id": "Primary key",
+          "email": "User's email",
+          "avatar_url": "URL to user's avatar",
+          "status": "User's online status",
+          "role": "User's role (ADMIN or USER)"
+        }
+      }
     }
   },
   "taskSpecificRules": {

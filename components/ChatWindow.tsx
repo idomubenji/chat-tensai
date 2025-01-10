@@ -1,7 +1,7 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { cn } from "@/lib/utils";
 import { MessageReactions } from "./MessageReactions";
@@ -11,6 +11,7 @@ import { LoadingBall } from "./LoadingBall";
 import { UserName } from "./UserName";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import { Database } from "@/types/supabase";
+import { useReactionSubscription } from '@/hooks/useReactionSubscription';
 
 type Message = {
   id: string;
@@ -164,6 +165,79 @@ export function ChatWindow({
       console.error('Error adding reaction:', error);
     }
   };
+
+  const handleReactionUpdate = useCallback((messageId: string, newReactions: Message['reactions']) => {
+    setMessages(prevMessages => 
+      prevMessages.map(msg => 
+        msg.id === messageId
+          ? { ...msg, reactions: newReactions }
+          : msg
+      )
+    );
+  }, []);
+
+  // Subscribe to reactions for all visible messages
+  useEffect(() => {
+    const supabase = createClientComponentClient<Database>();
+    const messageIds = messages.map(message => message.id);
+    const channels = messageIds.map(messageId => 
+      supabase
+        .channel(`message-reactions-${messageId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'message_reactions',
+            filter: `message_id=eq.${messageId}`
+          },
+          async () => {
+            // Fetch all reactions for this message
+            const { data: reactions } = await supabase
+              .from('message_reactions')
+              .select(`
+                *,
+                user:users(*)
+              `)
+              .eq('message_id', messageId);
+
+            if (!reactions) return;
+
+            // Transform reactions into the expected format
+            const formattedReactions = reactions.reduce((acc: {
+              [key: string]: {
+                emoji: string;
+                userIds: string[];
+                users: { name: string }[];
+              };
+            }, reaction: any) => {
+              const { emoji, user } = reaction;
+              if (!acc[emoji]) {
+                acc[emoji] = {
+                  emoji,
+                  userIds: [],
+                  users: []
+                };
+              }
+              acc[emoji].userIds.push(reaction.user_id);
+              if (user) {
+                acc[emoji].users.push({ name: user.name });
+              }
+              return acc;
+            }, {});
+
+            handleReactionUpdate(messageId, formattedReactions);
+          }
+        )
+        .subscribe()
+    );
+
+    return () => {
+      channels.forEach(channel => {
+        supabase.removeChannel(channel);
+      });
+    };
+  }, [messages, handleReactionUpdate]);
 
   // Fetch messages
   useEffect(() => {
@@ -344,6 +418,7 @@ export function ChatWindow({
                       currentUserId={userId || ''}
                       onReactionSelect={handleReactionSelect}
                       align={isCurrentUser ? "start" : "end"}
+                      reactions={message.reactions}
                     />
                     <MessageReplyButton
                       onClick={() => handleSelectMessage(message)}
@@ -360,29 +435,6 @@ export function ChatWindow({
                   </div>
                 )}
               </div>
-              {Object.entries(message.reactions).length > 0 && (
-                <div className={cn(
-                  "flex flex-wrap gap-1",
-                  isCurrentUser ? "self-end" : "self-start"
-                )}>
-                  {Object.entries(message.reactions).map(([emoji, reaction]) => (
-                    <button
-                      key={emoji}
-                      onClick={() => handleReactionSelect(message.id, emoji)}
-                      className={cn(
-                        "inline-flex items-center gap-1 px-2 py-1 rounded text-sm",
-                        "border-2 border-black hover:bg-white/50 transition-colors",
-                        reaction.userIds.includes(userId || '') && "bg-white/50"
-                      )}
-                    >
-                      <span>{emoji}</span>
-                      {reaction.userIds.length > 1 && (
-                        <span className="text-xs text-gray-600">{reaction.userIds.length}</span>
-                      )}
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
           );
         })}
