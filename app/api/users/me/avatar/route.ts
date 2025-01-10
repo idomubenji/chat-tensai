@@ -5,7 +5,7 @@ import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Database } from '@/types/supabase';
-import { getAuthUserId } from '@/lib/auth';
+import { getAuthSession } from '@/lib/auth';
 
 // Initialize S3 client
 const s3 = new S3Client({
@@ -38,10 +38,11 @@ const URL_EXPIRATION = 604800;
 export async function POST(req: Request) {
   try {
     // 1. Auth check
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+    const userId = session.user.id;
 
     console.log('\n=== AVATAR UPLOAD: START ===');
     console.log('Attempting operation with:', {
@@ -188,10 +189,11 @@ export async function POST(req: Request) {
 
 export async function DELETE() {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    const session = await getAuthSession();
+    if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+    const userId = session.user.id;
 
     // Update user in database to use default avatar
     const { data, error } = await supabaseAdmin
