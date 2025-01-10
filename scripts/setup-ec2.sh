@@ -54,5 +54,11 @@ sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --permanent --add-service=https
 sudo firewall-cmd --reload
 
-# Setup PM2 to start on boot
-pm2 startup 
+# Setup PM2 to start on boot (with error handling)
+PM2_STARTUP_CMD=$(pm2 startup | grep "sudo env")
+if [ ! -z "$PM2_STARTUP_CMD" ]; then
+    eval "sudo $PM2_STARTUP_CMD"
+    echo "PM2 startup configured successfully"
+else
+    echo "Failed to get PM2 startup command, but continuing anyway..."
+fi 

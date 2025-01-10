@@ -12,9 +12,14 @@ npm install
 # Build the application
 npm run build
 
-# Start with PM2
-pm2 delete chat-genius || true
-pm2 start npm --name "chat-genius" -- start
+# Start/Restart with PM2
+if pm2 list | grep -q "chat-genius"; then
+    # Restart if exists
+    pm2 restart chat-genius
+else
+    # Start if doesn't exist
+    pm2 start npm --name "chat-genius" -- start
+fi
 
 # Save PM2 process list
 pm2 save
