@@ -10,7 +10,6 @@ import {
   getUser,
   getChannel,
   getChannelMessages,
-  getChannelMembers,
   createMessage,
   addReaction,
   removeReaction
@@ -69,13 +68,7 @@ async function testDatabaseOperations() {
     console.log('Sample message:', messages?.[0]?.content);
     console.log('---\n');
 
-    // 4. Get channel members
-    console.log('4. Testing getChannelMembers...');
-    const members = await getChannelMembers(testChannel.id);
-    console.log(`Found ${members?.length} members in channel`);
-    console.log('---\n');
-
-    // 5. Create a new message
+    // 4. Create a new message
     console.log('5. Testing createMessage...');
     const newMessage = await createMessage({
       id: randomUUID(),
@@ -87,7 +80,7 @@ async function testDatabaseOperations() {
     console.log('Created message:', newMessage?.content);
     console.log('---\n');
 
-    // 6. Add and remove a reaction
+    // 5. Add and remove a reaction
     if (newMessage) {
       console.log('6. Testing reactions...');
       await addReaction({
