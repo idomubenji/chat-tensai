@@ -424,8 +424,8 @@ export function ThreadWindow({
   }
 
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between p-4 border-b">
+    <div className="flex flex-col h-full w-full bg-[#D5C6B3] border-l-2 border-l-black">
+      <div className="flex items-center justify-between p-4 border-b border-gray-200 bg-[#E0D6C3]">
         <h2 className="text-lg font-semibold">Thread</h2>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-4 w-4" />
@@ -437,16 +437,16 @@ export function ThreadWindow({
         {replies.map(reply => renderMessage(reply))}
       </div>
 
-      <div className="sticky bottom-0 border-t bg-white p-4">
+      <div className="sticky bottom-0 border-t border-gray-200 bg-[#E0D6C3] p-4">
         <form onSubmit={handleSubmit} className="flex items-center gap-2">
           <Input
             type="text"
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             placeholder={`Reply${replyingTo ? ` to ${replyingTo.user.name}` : ''}...`}
-            className="flex-1"
+            className="flex-1 bg-white/75"
           />
-          <Button type="submit" size="icon">
+          <Button type="submit" size="icon" className="bg-[#6F8FAF] hover:bg-[#5A7593]">
             <Send className="h-4 w-4" />
           </Button>
         </form>

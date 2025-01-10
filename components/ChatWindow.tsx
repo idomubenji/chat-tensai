@@ -483,9 +483,12 @@ export function ChatWindow({
                 {replyCount > 0 && (
                   <div
                     onClick={() => handleSelectMessage(message)}
-                    className="text-sm text-blue-500 hover:underline mt-1 cursor-pointer"
+                    className={cn(
+                      "text-sm text-blue-500 hover:underline mt-1 cursor-pointer",
+                      isCurrentUser ? "pr-12" : "pl-12"
+                    )}
                   >
-                    View {replyCount} {replyCount === 1 ? 'Reply' : 'Replies'}
+                    {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
                   </div>
                 )}
               </div>
