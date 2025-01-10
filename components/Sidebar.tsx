@@ -14,19 +14,38 @@ import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
 import { ProfilePicture } from '@/components/ProfilePicture';
 import { SignOutButton } from '@/components/SignOutButton';
+import Image from 'next/image';
 
 export function Sidebar() {
   const { user } = useSupabaseAuth();
   const { channels, isLoading } = useChannels();
+  const router = useRouter();
 
   if (!user) return null;
 
+  const handleProfileClick = () => {
+    router.push('/settings');
+  };
+
   return (
-    <div className="w-64 bg-[#6F8FAF] flex flex-col">
-      <div className="p-4 flex items-center justify-between">
-        <ProfilePicture />
-        <SignOutButton />
+    <div className="w-64 bg-[#6F8FAF] flex flex-col h-full">
+      {/* Header with logo and title */}
+      <div className="p-4 flex flex-col items-center gap-2">
+        <Image
+          src="/chat-tensai-icon.png"
+          alt="Chat Tensai Logo"
+          width={192}
+          height={192}
+        />
+        <Image
+          src="/chat-tensai-title.png"
+          alt="Chat Tensai"
+          width={200}
+          height={40}
+        />
       </div>
+
+      {/* Main content */}
       <div className="flex-1 overflow-y-auto">
         <Accordion type="single" collapsible defaultValue="channels">
           <AccordionItem value="channels" className="border-none">
@@ -41,6 +60,17 @@ export function Sidebar() {
             </AccordionContent>
           </AccordionItem>
         </Accordion>
+      </div>
+
+      {/* Footer with profile and sign out */}
+      <div className="p-4 border-t border-[#5A7593] flex items-center justify-between">
+        <button
+          onClick={handleProfileClick}
+          className="hover:opacity-80 transition-opacity"
+        >
+          <ProfilePicture />
+        </button>
+        <SignOutButton />
       </div>
     </div>
   );
