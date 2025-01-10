@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Smile } from 'lucide-react';
@@ -22,6 +22,8 @@ interface MessageReactionsProps {
       users?: { name: string }[];
     };
   };
+  showButton?: boolean;
+  buttonRef?: string;
 }
 
 export function MessageReactions({
@@ -29,12 +31,19 @@ export function MessageReactions({
   currentUserId,
   onReactionSelect,
   align = 'start',
-  reactions = {}
+  reactions = {},
+  showButton = false,
+  buttonRef
 }: MessageReactionsProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [optimisticReactions, setOptimisticReactions] = useState(reactions);
   const { toast } = useToast();
   const supabase = createClientComponentClient<Database>();
+
+  // Sync optimisticReactions with reactions prop when it changes
+  useEffect(() => {
+    setOptimisticReactions(reactions);
+  }, [reactions]);
 
   const handleEmojiSelect = async (emoji: any) => {
     if (!emoji.native) return;
@@ -100,39 +109,47 @@ export function MessageReactions({
   };
 
   const renderReactions = () => {
-    return Object.entries(optimisticReactions).map(([emoji, reaction]) => (
-      <TooltipProvider key={emoji}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              onClick={() => handleEmojiSelect({ native: emoji })}
-              className={cn(
-                "inline-flex items-center gap-1 px-2 py-1 rounded text-sm",
-                "border-2 border-black hover:bg-white/50 transition-colors",
-                reaction.userIds.includes(currentUserId) && "bg-white/50"
-              )}
-            >
-              <span>{emoji}</span>
-              {reaction.userIds.length > 1 && (
-                <span className="text-xs text-gray-600">{reaction.userIds.length}</span>
-              )}
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>
-            <p className="text-sm">
-              {reaction.users
-                ? reaction.users.map(u => u.name).join(", ")
-                : `${reaction.userIds.length} ${reaction.userIds.length === 1 ? 'user' : 'users'}`}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    ));
+    // Debug log
+    console.log('Rendering reactions:', optimisticReactions);
+    
+    return Object.entries(optimisticReactions).map(([emoji, reaction]) => {
+      // Debug log
+      console.log('Rendering reaction:', emoji, reaction);
+      
+      return (
+        <TooltipProvider key={emoji}>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                onClick={() => handleEmojiSelect({ native: emoji })}
+                className={cn(
+                  "inline-flex items-center gap-1 px-2 py-1 rounded text-sm",
+                  "border-2 border-black hover:bg-white/50 transition-colors",
+                  reaction.userIds.includes(currentUserId) && "bg-white/50"
+                )}
+              >
+                <span>{emoji}</span>
+                {reaction.userIds.length > 1 && (
+                  <span className="text-xs text-gray-600">{reaction.userIds.length}</span>
+                )}
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>
+              <div className="text-sm whitespace-pre-line font-normal">
+                {reaction.users
+                  ? reaction.users.map(u => u.name).join('\n')
+                  : `${reaction.userIds.length} ${reaction.userIds.length === 1 ? 'user' : 'users'}`}
+              </div>
+            </TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      );
+    });
   };
 
-  return (
-    <div className="flex flex-col gap-2">
-      <div className="flex items-center">
+  if (showButton) {
+    return (
+      <div id={buttonRef}>
         <Popover open={isOpen} onOpenChange={setIsOpen}>
           <PopoverTrigger asChild>
             <Button
@@ -159,11 +176,18 @@ export function MessageReactions({
           </PopoverContent>
         </Popover>
       </div>
-      {Object.keys(optimisticReactions).length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {renderReactions()}
-        </div>
-      )}
+    );
+  }
+
+  // Debug log
+  console.log('Reactions component render:', {
+    hasReactions: Object.keys(optimisticReactions).length > 0,
+    reactions: optimisticReactions
+  });
+
+  return Object.keys(optimisticReactions).length > 0 ? (
+    <div className="flex flex-wrap gap-1">
+      {renderReactions()}
     </div>
-  );
+  ) : null;
 } 

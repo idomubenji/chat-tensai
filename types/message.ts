@@ -1,18 +1,22 @@
 export interface Message {
   id: string;
   content: string;
-  channelId: string;
-  userId: string;
-  createdAt: string;
-  updatedAt: string;
+  channel_id: string;
+  user_id: string;
+  created_at: string;
+  updated_at: string;
   user: {
     id: string;
-    username: string;
+    name: string;
+    avatar_url: string | null;
+    role?: string;
   };
-  reactions: Array<{
-    id: string;
-    emoji: string;
-    userId: string;
-  }>;
-  threadMessages: Message[];
+  reactions: {
+    [key: string]: {
+      emoji: string;
+      userIds: string[];
+      users?: { name: string }[];
+    };
+  };
+  replies?: Message[];
 } 

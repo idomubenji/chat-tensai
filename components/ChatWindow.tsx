@@ -1,6 +1,6 @@
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Send } from "lucide-react";
+import { Send, Smile } from "lucide-react";
 import { useState, useEffect, useRef, useCallback } from "react";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { cn } from "@/lib/utils";
@@ -9,26 +9,11 @@ import { MessageReplyButton } from "./MessageReplyButton";
 import { ThreadWindow } from "./ThreadWindow";
 import { LoadingBall } from "./LoadingBall";
 import { UserName } from "./UserName";
+import { ProfilePicture } from "./ProfilePicture";
 import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 import type { Database } from "@/types/supabase";
+import type { Message } from "@/types/message";
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
-import { useReactionSubscription } from '@/hooks/useReactionSubscription';
-
-type Message = {
-  id: string;
-  content: string;
-  userId: string;
-  userName: string;
-  userRole?: string;
-  createdAt: string;
-  reactions: {
-    [key: string]: {
-      emoji: string;
-      userIds: string[];
-    };
-  };
-  replies?: Message[];
-};
 
 interface ChatWindowProps {
   channelId: string;
@@ -81,9 +66,15 @@ export function ChatWindow({
     const optimisticMessage: Message = {
       id: `temp-${Date.now()}`,
       content: newMessage,
-      userId: userId || '',
-      userName: 'You', // This will be updated when we fetch
-      createdAt: new Date().toISOString(),
+      user_id: userId || '',
+      channel_id: channelId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      user: {
+        id: userId || '',
+        name: 'You',
+        avatar_url: null
+      },
       reactions: {},
       replies: []
     };
@@ -263,26 +254,42 @@ export function ChatWindow({
         }
         const messages = await response.json();
         
+        // Debug log
+        console.log('Raw messages:', messages);
+        
         // Transform the messages to match our expected format
         const transformedMessages = messages.map((msg: any) => ({
           id: msg.id,
           content: msg.content,
-          userId: msg.user_id,
-          userName: msg.user?.name || 'Unknown User',
-          userRole: msg.user?.role,
-          createdAt: msg.created_at,
+          channel_id: msg.channel_id,
+          user_id: msg.user_id,
+          created_at: msg.created_at,
+          updated_at: msg.updated_at,
+          user: {
+            id: msg.user.id,
+            name: msg.user.name,
+            avatar_url: msg.user.avatar_url,
+            role: msg.user.role
+          },
           reactions: (msg.reactions || []).reduce((acc: any, reaction: any) => {
             if (!acc[reaction.emoji]) {
               acc[reaction.emoji] = {
                 emoji: reaction.emoji,
-                userIds: []
+                userIds: [],
+                users: []
               };
             }
             acc[reaction.emoji].userIds.push(reaction.user_id);
+            if (reaction.user) {
+              acc[reaction.emoji].users.push({ name: reaction.user.name });
+            }
             return acc;
           }, {}),
-          replies: [] // TODO: Implement replies
+          replies: []
         }));
+
+        // Debug log
+        console.log('Transformed messages:', transformedMessages);
 
         setMessages(transformedMessages);
       } catch (error) {
@@ -318,18 +325,28 @@ export function ChatWindow({
             const transformedMessages = messages.map((msg: any) => ({
               id: msg.id,
               content: msg.content,
-              userId: msg.user_id,
-              userName: msg.user?.name || 'Unknown User',
-              userRole: msg.user?.role,
-              createdAt: msg.created_at,
+              channel_id: msg.channel_id,
+              user_id: msg.user_id,
+              created_at: msg.created_at,
+              updated_at: msg.updated_at,
+              user: {
+                id: msg.user.id,
+                name: msg.user.name,
+                avatar_url: msg.user.avatar_url,
+                role: msg.user.role
+              },
               reactions: (msg.reactions || []).reduce((acc: any, reaction: any) => {
                 if (!acc[reaction.emoji]) {
                   acc[reaction.emoji] = {
                     emoji: reaction.emoji,
-                    userIds: []
+                    userIds: [],
+                    users: []
                   };
                 }
                 acc[reaction.emoji].userIds.push(reaction.user_id);
+                if (reaction.user) {
+                  acc[reaction.emoji].users.push({ name: reaction.user.name });
+                }
                 return acc;
               }, {}),
               replies: []
@@ -368,7 +385,7 @@ export function ChatWindow({
     <div className="flex flex-col h-full bg-[#F5E6D3]">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => {
-          const isCurrentUser = message.userId === userId;
+          const isCurrentUser = message.user_id === userId;
           const replyCount = message.replies?.length || 0;
 
           return (
@@ -387,23 +404,23 @@ export function ChatWindow({
                   {isCurrentUser ? (
                     <>
                       <span className="text-xs text-gray-600">
-                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                       <UserName
-                        name={message.userName}
-                        userId={message.userId}
-                        role={message.userRole}
+                        name={message.user.name}
+                        userId={message.user.id}
+                        role={message.user.role}
                       />
                     </>
                   ) : (
                     <>
                       <UserName
-                        name={message.userName}
-                        userId={message.userId}
-                        role={message.userRole}
+                        name={message.user.name}
+                        userId={message.user.id}
+                        role={message.user.role}
                       />
                       <span className="text-xs text-gray-600">
-                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        {new Date(message.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     </>
                   )}
@@ -412,6 +429,15 @@ export function ChatWindow({
                   "flex items-start gap-2",
                   isCurrentUser && "flex-row-reverse"
                 )}>
+                  <div className="w-8 h-8 flex-shrink-0">
+                    <ProfilePicture
+                      size="default"
+                      borderColor={isCurrentUser ? "black" : "white"}
+                      borderWidth="thin"
+                      shouldFetch={false}
+                      avatarUrl={message.user.avatar_url}
+                    />
+                  </div>
                   <div
                     className={cn(
                       "rounded-lg px-4 py-2 text-sm break-words",
@@ -432,6 +458,7 @@ export function ChatWindow({
                       onReactionSelect={handleReactionSelect}
                       align={isCurrentUser ? "start" : "end"}
                       reactions={message.reactions}
+                      showButton
                     />
                     <MessageReplyButton
                       onClick={() => handleSelectMessage(message)}
@@ -439,6 +466,20 @@ export function ChatWindow({
                     />
                   </div>
                 </div>
+                {Object.keys(message.reactions).length > 0 && (
+                  <div className={cn(
+                    "flex flex-wrap gap-1 mt-1",
+                    isCurrentUser ? "pr-12" : "pl-12"
+                  )}>
+                    <MessageReactions
+                      messageId={message.id}
+                      currentUserId={userId || ''}
+                      onReactionSelect={handleReactionSelect}
+                      align={isCurrentUser ? "start" : "end"}
+                      reactions={message.reactions}
+                    />
+                  </div>
+                )}
                 {replyCount > 0 && (
                   <div
                     onClick={() => handleSelectMessage(message)}
