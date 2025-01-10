@@ -68,7 +68,7 @@ export function Sidebar() {
           onClick={handleProfileClick}
           className="hover:opacity-80 transition-opacity"
         >
-          <ProfilePicture />
+          <ProfilePicture borderColor="black" borderWidth="thin" shouldFetch />
         </button>
         <SignOutButton />
       </div>

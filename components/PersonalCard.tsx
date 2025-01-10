@@ -1,7 +1,7 @@
 import { ProfilePicture } from './ProfilePicture';
 import { UserName } from './UserName';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
-import useSWR from 'swr';
+import useSWR, { mutate } from 'swr';
 
 interface PersonalCardProps {
   className?: string;
@@ -14,13 +14,19 @@ const fetcher = async (url: string) => {
   return res.json();
 };
 
+// Key for the user data SWR cache
+export const USER_DATA_KEY = '/api/users/me';
+
 export function PersonalCard({ className }: PersonalCardProps) {
   const { user } = useSupabaseAuth();
-  const { data: userData, error } = useSWR('/api/users/me', fetcher, {
+  const { data: userData, error } = useSWR(USER_DATA_KEY, fetcher, {
     revalidateOnFocus: true,
     revalidateOnReconnect: true,
     refreshInterval: 30000, // Refresh every 30 seconds
-    dedupingInterval: 5000, // Only make one request per 5 seconds
+    dedupingInterval: 2000, // Only make one request per 2 seconds
+    revalidateOnMount: true,
+    refreshWhenHidden: true,
+    refreshWhenOffline: true,
   });
 
   if (!user) return null;
@@ -32,6 +38,8 @@ export function PersonalCard({ className }: PersonalCardProps) {
           size="large" 
           avatarUrl={userData?.avatar_url} 
           isLoading={!userData && !error}
+          borderColor="white"
+          borderWidth="thick"
         />
       </div>
       <div className="flex flex-col gap-4">

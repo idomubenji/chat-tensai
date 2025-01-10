@@ -15,6 +15,8 @@ import { PersonalCard } from "@/components/PersonalCard";
 import { AvatarUpload } from "@/components/AvatarUpload";
 import { useToast } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
+import { mutate } from 'swr';
+import { USER_DATA_KEY } from '@/components/PersonalCard';
 
 interface UserSettings {
   bio: string;
@@ -73,32 +75,37 @@ export default function SettingsPage() {
   }, [isLoaded, user, router, toast]);
 
   const handleSave = async () => {
+    setIsSaving(true);
     try {
-      setIsSaving(true);
-      
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify(settings),
+        body: JSON.stringify({
+          bio: settings.bio,
+          status_message: settings.status_message,
+          status_emoji: settings.status_emoji,
+        }),
       });
 
-      if (!response.ok) throw new Error('Failed to update settings');
+      if (!response.ok) {
+        throw new Error('Failed to update user settings');
+      }
+
+      // Trigger revalidation of the user data
+      await mutate(USER_DATA_KEY);
       
       toast({
-        title: "Success",
-        description: "Your settings have been saved successfully.",
-        duration: 3000,
+        title: 'Settings saved!',
+        description: 'Your profile has been updated successfully.',
       });
-      
-      router.refresh();
     } catch (error) {
       console.error('Error saving settings:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to save settings. Please try again.",
+        title: 'Error saving settings',
+        description: 'There was a problem updating your profile. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
