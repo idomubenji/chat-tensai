@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       console.log('User data upserted:', userData);
 
       // Get all channels
-      let { data: channels, error: channelsError } = await supabase
+      const { data: channels, error: channelsError } = await supabase
         .from('channels')
         .select('id');
 
