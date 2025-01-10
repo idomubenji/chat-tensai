@@ -7,6 +7,9 @@ sudo yum update -y
 curl -fsSL https://rpm.nodesource.com/setup_18.x | sudo bash -
 sudo yum install -y nodejs
 
+# Install git
+sudo yum install -y git
+
 # Install nginx
 sudo yum install -y nginx
 
@@ -16,6 +19,11 @@ sudo npm install -y pm2@latest -g
 # Create app directory
 sudo mkdir -p /var/www/chat-genius
 sudo chown ec2-user:ec2-user /var/www/chat-genius
+
+# Configure git for EC2 user
+git config --global credential.helper store
+git config --global user.email "deploy@chat-genius.com"
+git config --global user.name "Deploy Bot"
 
 # Basic nginx configuration
 sudo tee /etc/nginx/conf.d/chat-genius.conf << EOF
@@ -44,4 +52,7 @@ sudo systemctl start firewalld
 sudo systemctl enable firewalld
 sudo firewall-cmd --permanent --add-service=http
 sudo firewall-cmd --permanent --add-service=https
-sudo firewall-cmd --reload 
+sudo firewall-cmd --reload
+
+# Setup PM2 to start on boot
+pm2 startup 

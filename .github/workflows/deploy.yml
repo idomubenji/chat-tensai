@@ -2,62 +2,57 @@ name: Deploy to EC2
 
 on:
   push:
-    branches: [ "main" ]
-
-env:
-  AWS_REGION: us-east-1
-  EC2_INSTANCE_ID: ${{ secrets.EC2_INSTANCE_ID }}
-
-permissions:
-  contents: read
-  id-token: write
+    branches:
+      - main  # or your default branch
 
 jobs:
   deploy:
-    name: Deploy
     runs-on: ubuntu-latest
-    environment: production
-
+    
     steps:
-    - name: Checkout
-      uses: actions/checkout@v3
-
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        role-to-assume: arn:aws:iam::474668398195:role/UnifiedServicesRole
-        aws-region: ${{ env.AWS_REGION }}
-
-    - name: Test AWS Connection
-      run: |
-        echo "Testing AWS Connection..."
-        aws sts get-caller-identity
-        echo "Testing SSM access..."
-        aws ssm describe-instance-information --region us-east-1
-
-    - name: Add Parameters to SSM
-      run: |
-        aws ssm put-parameter --name "/chat-genius/DATABASE_URL" --value "${{ secrets.DATABASE_URL }}" --type "SecureString" --overwrite
-        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" --value "${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY }}" --type "SecureString" --overwrite
-        aws ssm put-parameter --name "/chat-genius/CLERK_SECRET_KEY" --value "${{ secrets.CLERK_SECRET_KEY }}" --type "SecureString" --overwrite
-        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_SUPABASE_URL" --value "${{ secrets.NEXT_PUBLIC_SUPABASE_URL }}" --type "SecureString" --overwrite
-        aws ssm put-parameter --name "/chat-genius/NEXT_PUBLIC_SUPABASE_ANON_KEY" --value "${{ secrets.NEXT_PUBLIC_SUPABASE_ANON_KEY }}" --type "SecureString" --overwrite
-
-    - name: Build Application
-      run: |
-        npm ci
-        npm run build
-
-    - name: Deploy to EC2
-      run: |
-        echo "Deploying to instance ${{ env.EC2_INSTANCE_ID }}..."
-        aws ssm send-command \
-          --document-name "AWS-RunShellScript" \
-          --targets "Key=instanceids,Values=${{ env.EC2_INSTANCE_ID }}" \
-          --parameters 'commands=[
-            "cd /home/ec2-user/chat-genius",
-            "git pull origin main",
-            "npm ci",
-            "npm run build",
-            "pm2 restart chat-genius || pm2 start npm --name chat-genius -- start"
-          ]' 
+      - uses: actions/checkout@v3
+      
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          echo "${{ secrets.EC2_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          
+      - name: Deploy to EC2
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ec2-user
+        run: |
+          # Copy deployment scripts
+          scp -i ~/.ssh/deploy_key scripts/setup-ec2.sh scripts/deploy.sh $EC2_USER@$EC2_HOST:~
+          
+          # Copy environment file
+          scp -i ~/.ssh/deploy_key .env.production $EC2_USER@$EC2_HOST:~
+          
+          # Run setup if not already done
+          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
+            if [ ! -d "/var/www/chat-genius" ]; then
+              chmod +x ~/setup-ec2.sh
+              ~/setup-ec2.sh
+            fi
+          '
+          
+          # Deploy application
+          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
+            cd /var/www/chat-genius
+            
+            # Pull latest changes
+            if [ -d ".git" ]; then
+              git pull
+            else
+              git clone ${{ secrets.REPO_URL }} .
+            fi
+            
+            # Copy env file
+            cp ~/env.production .env.production
+            
+            # Run deployment
+            chmod +x scripts/deploy.sh
+            ./scripts/deploy.sh
+          ' 
