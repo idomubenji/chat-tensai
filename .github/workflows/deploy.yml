@@ -18,6 +18,12 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           echo "${{ secrets.EC2_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+      
+      - name: Create env file
+        run: |
+          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> .env.production
+          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> .env.production
+          echo "PRODUCTION_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> .env.production
           
       - name: Deploy to EC2
         env:
@@ -50,7 +56,7 @@ jobs:
             fi
             
             # Copy env file
-            cp ~/env.production .env.production
+            cp ~/.env.production .env.production
             
             # Run deployment
             chmod +x scripts/deploy.sh
