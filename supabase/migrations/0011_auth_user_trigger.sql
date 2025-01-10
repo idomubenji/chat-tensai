@@ -2,17 +2,30 @@
 CREATE OR REPLACE FUNCTION public.handle_new_user()
 RETURNS trigger AS $$
 BEGIN
+  -- Create user profile
   INSERT INTO public.users (id, email, name)
-  VALUES (new.id, new.email, COALESCE(new.raw_user_meta_data->>'name', new.email));
+  VALUES (
+    new.id,
+    new.email,
+    COALESCE(
+      new.raw_user_meta_data->>'username',  -- Try to get username from metadata
+      new.raw_user_meta_data->>'name',      -- Fall back to name from metadata
+      new.email                             -- Finally fall back to email
+    )
+  );
 
-  -- Add the user to the general channel if it exists
-  INSERT INTO public.channel_members (channel_id, user_id)
-  SELECT id, new.id
+  -- Add the user to all channels
+  INSERT INTO public.channel_members (channel_id, user_id, role_in_channel)
+  SELECT id, new.id, 'MEMBER'
   FROM public.channels
-  WHERE name = 'general'
   ON CONFLICT DO NOTHING;
 
   RETURN new;
+EXCEPTION
+  WHEN OTHERS THEN
+    -- Log any errors
+    RAISE NOTICE 'Error in handle_new_user trigger: %', SQLERRM;
+    RETURN new;
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 

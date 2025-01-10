@@ -2,7 +2,6 @@ import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
 import { Inter } from "next/font/google";
 import { Metadata } from "next";
 import "./globals.css";
-import { Sidebar } from "@/components/Sidebar";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -17,12 +16,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SupabaseProvider>
-      <html lang="en" className="h-full">
-        <body className={`${inter.className} h-full`}>
-          {children}
-        </body>
-      </html>
-    </SupabaseProvider>
+    <html lang="en" className="h-full">
+      <body className={`${inter.className} h-full`}>
+        <SupabaseProvider>
+          <main className="h-full">
+            {children}
+          </main>
+        </SupabaseProvider>
+      </body>
+    </html>
   );
 }

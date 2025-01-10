@@ -13,18 +13,25 @@ export default function Home() {
 
   useEffect(() => {
     if (isLoaded && !userId) {
-      router.push('/sign-in');
+      router.replace('/sign-in');
     }
   }, [isLoaded, userId, router]);
 
-  // Show loading state while checking auth
   if (!isLoaded) {
-    return <LoadingBall />;
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <LoadingBall />
+      </div>
+    );
   }
 
-  // Only show the main content if user is authenticated
+  // Don't render anything while redirecting to sign-in
   if (!userId) {
-    return null; // Return null while redirecting
+    return (
+      <div className="h-full w-full flex items-center justify-center">
+        <LoadingBall />
+      </div>
+    );
   }
 
   return (

@@ -25,40 +25,39 @@ export async function POST() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
 
-    // Get all channels
-    const { data: channels, error: channelsError } = await supabase
+    // Get general channel
+    const { data: generalChannel, error: channelError } = await supabase
       .from('channels')
-      .select('id');
+      .select('id')
+      .or('name.eq.general,name.eq.#general')
+      .single();
 
-    if (channelsError) {
-      console.error('Error fetching channels:', channelsError);
-      return NextResponse.json({ error: 'Failed to fetch channels' }, { status: 500 });
+    if (channelError) {
+      console.error('Error fetching general channel:', channelError);
+      return NextResponse.json({ error: 'Failed to fetch general channel' }, { status: 500 });
     }
 
-    console.log('Adding user to channels:', channels);
+    // Add user to general channel
+    const { error: memberError } = await supabase
+      .from('channel_members')
+      .upsert({
+        channel_id: generalChannel.id,
+        user_id: userId,
+        role_in_channel: 'MEMBER'
+      }, {
+        onConflict: 'user_id,channel_id'
+      });
 
-    // Add user to all channels if they're not already a member
-    for (const channel of channels) {
-      const { error: memberError } = await supabase
-        .from('channel_members')
-        .upsert({
-          channel_id: channel.id,
-          user_id: userId,
-          role_in_channel: 'MEMBER'
-        }, {
-          onConflict: 'user_id,channel_id'
-        });
-
-      if (memberError) {
-        console.error(`Error adding user to channel ${channel.id}:`, memberError);
-      } else {
-        console.log(`Added user to channel ${channel.id}`);
-      }
+    if (memberError) {
+      console.error('Error adding user to general channel:', memberError);
+      return NextResponse.json({ error: 'Failed to add user to general channel' }, { status: 500 });
     }
+
+    console.log('Added user to general channel:', generalChannel.id);
 
     return NextResponse.json(user);
   } catch (error) {
-    console.error('Error in sync endpoint:', error);
+    console.error('Error in sync:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 } 

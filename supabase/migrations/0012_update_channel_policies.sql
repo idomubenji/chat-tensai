@@ -10,7 +10,7 @@ CREATE POLICY "Users can view channel members"
     EXISTS (
       SELECT 1 FROM channel_members cm
       WHERE cm.channel_id = channel_members.channel_id
-      AND cm.user_id = auth.uid()
+      AND cm.user_id = auth.uid()::text
     )
   );
 
@@ -23,7 +23,7 @@ CREATE POLICY "Users can join public channels"
       WHERE c.id = channel_id
       AND NOT c.is_private
     )
-    AND user_id = auth.uid()
+    AND user_id = auth.uid()::text
   );
 
 CREATE POLICY "Admins can manage channel members"
@@ -33,7 +33,7 @@ CREATE POLICY "Admins can manage channel members"
     EXISTS (
       SELECT 1 FROM channel_members cm
       WHERE cm.channel_id = channel_members.channel_id
-      AND cm.user_id = auth.uid()
+      AND cm.user_id = auth.uid()::text
       AND cm.role_in_channel = 'ADMIN'
     )
   )
@@ -41,7 +41,7 @@ CREATE POLICY "Admins can manage channel members"
     EXISTS (
       SELECT 1 FROM channel_members cm
       WHERE cm.channel_id = channel_members.channel_id
-      AND cm.user_id = auth.uid()
+      AND cm.user_id = auth.uid()::text
       AND cm.role_in_channel = 'ADMIN'
     )
   ); 

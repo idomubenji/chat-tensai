@@ -19,7 +19,7 @@ export async function POST(request: Request) {
       throw fetchError;
     }
 
-    // If user doesn't exist, create them
+    // If user doesn't exist, create them with the provided username
     if (!existingUser) {
       console.log('Creating new user:', { userId, email, username });
       const { error: insertError } = await supabase
@@ -28,7 +28,7 @@ export async function POST(request: Request) {
           {
             id: userId,
             email: email,
-            name: username || email.split('@')[0],
+            name: username || email.split('@')[0], // Use username if provided, otherwise use email prefix
             role: 'USER',
             status: 'ONLINE',
           },
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
     }
 
     // Get all channels
-    let { data: channels, error: channelsError } = await supabase
+    const { data: channels, error: channelsError } = await supabase
       .from('channels')
       .select('id');
 
@@ -50,55 +50,43 @@ export async function POST(request: Request) {
       throw channelsError;
     }
 
-    // If there are no channels, create the general channel
-    if (!channels || channels.length === 0) {
-      console.log('Creating general channel');
-      const { data: generalChannel, error: createChannelError } = await supabase
-        .from('channels')
-        .insert([
-          {
-            name: 'general',
-            description: 'General discussion',
-            is_private: false,
-            created_by_id: userId,
-          },
-        ])
-        .select()
-        .single();
-
-      if (createChannelError) {
-        console.error('Error creating general channel:', createChannelError);
-        throw createChannelError;
-      }
-
-      channels = [generalChannel];
-    }
-
     // Add user to all channels
     console.log('Adding user to channels:', channels);
     const channelMemberships = channels.map(channel => ({
-      user_id: userId,
       channel_id: channel.id,
-      role_in_channel: 'MEMBER',
+      user_id: userId,
+      role_in_channel: 'MEMBER'
     }));
 
-    const { error: membershipError } = await supabase
-      .from('channel_members')
-      .upsert(channelMemberships, {
-        onConflict: 'user_id,channel_id',
-      });
+    if (channelMemberships.length > 0) {
+      const { error: membershipError } = await supabase
+        .from('channel_members')
+        .upsert(channelMemberships, {
+          onConflict: 'user_id,channel_id'
+        });
 
-    if (membershipError) {
-      console.error('Error adding user to channels:', membershipError);
-      throw membershipError;
+      if (membershipError) {
+        console.error('Error adding user to channels:', membershipError);
+        throw membershipError;
+      }
     }
 
-    console.log('User onboarding completed successfully');
-    return NextResponse.json({ success: true });
+    // Get the updated user data
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single();
+
+    if (userError) {
+      throw userError;
+    }
+
+    return NextResponse.json(user);
   } catch (error) {
-    console.error('Error in handleUserOnboarding:', error);
+    console.error('Error in onboarding:', error);
     return NextResponse.json(
-      { success: false, error: error instanceof Error ? error.message : 'An error occurred' },
+      { error: error instanceof Error ? error.message : 'An error occurred during onboarding' },
       { status: 500 }
     );
   }

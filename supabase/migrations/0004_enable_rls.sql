@@ -5,19 +5,23 @@ ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE message_reactions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE files ENABLE ROW LEVEL SECURITY;
 
--- Drop existing policies
-DROP POLICY IF EXISTS "Users are viewable by everyone" ON users;
-DROP POLICY IF EXISTS "Users can update own record" ON users;
-DROP POLICY IF EXISTS "Public channels are viewable by everyone" ON channels;
-DROP POLICY IF EXISTS "Channel members can insert messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can view messages" ON messages;
+-- Create auth_uid function
+CREATE OR REPLACE FUNCTION auth_uid() RETURNS text AS $$
+  SELECT COALESCE(
+    current_setting('request.jwt.claim.sub', true),
+    (current_setting('request.jwt.claims', true)::jsonb->>'sub')
+  );
+$$ LANGUAGE sql STABLE;
+
+-- Drop existing policies first
+DROP POLICY IF EXISTS "Users are viewable by authenticated users" ON users;
+DROP POLICY IF EXISTS "Users can update their own record" ON users;
+DROP POLICY IF EXISTS "Channels are viewable by authenticated users" ON channels;
+DROP POLICY IF EXISTS "Admin users can create channels" ON channels;
+DROP POLICY IF EXISTS "Admin users can delete channels" ON channels;
+DROP POLICY IF EXISTS "Messages are viewable by authenticated users" ON messages;
+DROP POLICY IF EXISTS "Authenticated users can insert messages" ON messages;
 DROP POLICY IF EXISTS "Message authors can update their messages" ON messages;
-DROP POLICY IF EXISTS "Channel members can add reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view reactions" ON message_reactions;
-DROP POLICY IF EXISTS "Channel members can view files" ON files;
-DROP POLICY IF EXISTS "Channels are viewable by members" ON channels;
-DROP POLICY IF EXISTS "Channel members are viewable by channel members" ON channel_members;
-DROP POLICY IF EXISTS "Allow all access to channels" ON channels;
 
 -- Users policies
 CREATE POLICY "Users are viewable by authenticated users"
@@ -71,12 +75,6 @@ CREATE POLICY "Authenticated users can insert messages"
 
 CREATE POLICY "Message authors can update their messages"
   ON messages FOR UPDATE
-  TO authenticated
-  USING (user_id = auth_uid())
-  WITH CHECK (user_id = auth_uid());
-
-CREATE POLICY "Message authors can delete their messages"
-  ON messages FOR DELETE
   TO authenticated
   USING (user_id = auth_uid());
 
