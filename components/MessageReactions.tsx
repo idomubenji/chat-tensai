@@ -7,6 +7,8 @@ import Picker from '@emoji-mart/react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { useToast } from "@/components/ui/use-toast";
 import { cn } from "@/lib/utils";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/types/supabase';
 
 interface MessageReactionsProps {
   messageId: string;
@@ -32,6 +34,7 @@ export function MessageReactions({
   const [isOpen, setIsOpen] = useState(false);
   const [optimisticReactions, setOptimisticReactions] = useState(reactions);
   const { toast } = useToast();
+  const supabase = createClientComponentClient<Database>();
 
   const handleEmojiSelect = async (emoji: any) => {
     if (!emoji.native) return;
@@ -63,7 +66,28 @@ export function MessageReactions({
     setIsOpen(false);
 
     try {
-      await onReactionSelect(messageId, emoji.native);
+      if (existingReaction?.userIds.includes(currentUserId)) {
+        // Remove reaction from Supabase
+        const { error: deleteError } = await supabase
+          .from('message_reactions')
+          .delete()
+          .eq('message_id', messageId)
+          .eq('user_id', currentUserId)
+          .eq('emoji', emojiKey);
+
+        if (deleteError) throw deleteError;
+      } else {
+        // Add reaction to Supabase
+        const { error: insertError } = await supabase
+          .from('message_reactions')
+          .insert({
+            message_id: messageId,
+            user_id: currentUserId,
+            emoji: emojiKey
+          });
+
+        if (insertError) throw insertError;
+      }
     } catch (error) {
       // Revert optimistic update on error
       setOptimisticReactions(reactions);

@@ -165,64 +165,67 @@ export function ThreadWindow({
   useEffect(() => {
     const supabase = createClientComponentClient<Database>();
     const messageIds = parentMessage ? [parentMessage.id, ...replies.map(reply => reply.id)] : [];
-    const channels = messageIds.map(messageId => 
-      supabase
-        .channel(`message-reactions-${messageId}`)
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'message_reactions',
-            filter: `message_id=eq.${messageId}`
-          },
-          async () => {
-            // Fetch all reactions for this message
-            const { data: reactions } = await supabase
-              .from('message_reactions')
-              .select(`
-                *,
-                user:users(*)
-              `)
-              .eq('message_id', messageId);
+    
+    if (messageIds.length === 0) return;
 
-            if (!reactions) return;
+    // Create a single channel for all message reactions in the thread
+    const channel = supabase
+      .channel(`thread-reactions-${messageId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reactions',
+          filter: `message_id=in.(${messageIds.join(',')})`,
+        },
+        async (payload) => {
+          const targetMessageId = payload.new?.message_id || payload.old?.message_id;
+          if (!targetMessageId) return;
 
-            // Transform reactions into the expected format
-            const formattedReactions = reactions.reduce((acc: {
-              [key: string]: {
-                emoji: string;
-                userIds: string[];
-                users: { name: string }[];
+          // Fetch all reactions for this message
+          const { data: reactions } = await supabase
+            .from('message_reactions')
+            .select(`
+              *,
+              user:users(*)
+            `)
+            .eq('message_id', targetMessageId);
+
+          if (!reactions) return;
+
+          // Transform reactions into the expected format
+          const formattedReactions = reactions.reduce((acc: {
+            [key: string]: {
+              emoji: string;
+              userIds: string[];
+              users: { name: string }[];
+            };
+          }, reaction: any) => {
+            const { emoji, user } = reaction;
+            if (!acc[emoji]) {
+              acc[emoji] = {
+                emoji,
+                userIds: [],
+                users: []
               };
-            }, reaction: any) => {
-              const { emoji, user } = reaction;
-              if (!acc[emoji]) {
-                acc[emoji] = {
-                  emoji,
-                  userIds: [],
-                  users: []
-                };
-              }
-              acc[emoji].userIds.push(reaction.user_id);
-              if (user) {
-                acc[emoji].users.push({ name: user.name });
-              }
-              return acc;
-            }, {});
+            }
+            acc[emoji].userIds.push(reaction.user_id);
+            if (user) {
+              acc[emoji].users.push({ name: user.name });
+            }
+            return acc;
+          }, {});
 
-            handleReactionUpdate(messageId, formattedReactions);
-          }
-        )
-        .subscribe()
-    );
+          handleReactionUpdate(targetMessageId, formattedReactions);
+        }
+      )
+      .subscribe();
 
     return () => {
-      channels.forEach(channel => {
-        supabase.removeChannel(channel);
-      });
+      supabase.removeChannel(channel);
     };
-  }, [parentMessage, replies, handleReactionUpdate]);
+  }, [parentMessage, replies, messageId, handleReactionUpdate]);
 
   const renderMessage = (message: Message, isParent: boolean = false) => {
     const isCurrentUser = message.userId === userId;
