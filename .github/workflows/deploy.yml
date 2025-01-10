@@ -40,6 +40,7 @@ jobs:
           echo "NODE_OPTIONS=--max_old_space_size=4096" >> .env.production
           echo "NEXT_DISABLE_ESLINT=1" >> .env.production
           echo "NEXT_DISABLE_TYPE_CHECKS=1" >> .env.production
+          cat .env.production
           
       - name: Deploy to EC2
         env:
@@ -49,7 +50,7 @@ jobs:
           # Copy deployment scripts
           scp -i ~/.ssh/deploy_key scripts/setup-ec2.sh scripts/deploy.sh $EC2_USER@$EC2_HOST:~
           
-          # Copy environment file
+          # Copy environment file from workspace
           scp -i ~/.ssh/deploy_key .env.production $EC2_USER@$EC2_HOST:~
           
           # Run setup if not already done
