@@ -11,23 +11,29 @@ import { Sidebar } from "@/components/Sidebar";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
 import { EmojiPicker } from "@/components/EmojiPicker";
-import Image from "next/image";
+import { PersonalCard } from "@/components/PersonalCard";
+import { AvatarUpload } from "@/components/AvatarUpload";
+import { useToast } from "@/components/ui/use-toast";
+import { Toaster } from "@/components/ui/toaster";
 
 interface UserSettings {
   bio: string;
   status_message: string;
   status_emoji: string;
   avatar_url: string | null;
+  username?: string;
 }
 
 export default function SettingsPage() {
   const { user, isLoaded } = useSupabaseAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>({
     bio: "",
     status_message: "",
     status_emoji: "",
     avatar_url: null,
+    username: "",
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -49,20 +55,27 @@ export default function SettingsPage() {
           status_message: data.status_message || "",
           status_emoji: data.status_emoji || "",
           avatar_url: data.avatar_url,
+          username: user?.user_metadata?.username || "",
         });
       } catch (error) {
         console.error('Error fetching user settings:', error);
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to load settings. Please try refreshing the page.",
+        });
       }
     };
 
     if (user) {
       fetchSettings();
     }
-  }, [isLoaded, user, router]);
+  }, [isLoaded, user, router, toast]);
 
   const handleSave = async () => {
     try {
       setIsSaving(true);
+      
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
         headers: {
@@ -72,9 +85,21 @@ export default function SettingsPage() {
       });
 
       if (!response.ok) throw new Error('Failed to update settings');
+      
+      toast({
+        title: "Success",
+        description: "Your settings have been saved successfully.",
+        duration: 3000,
+      });
+      
       router.refresh();
     } catch (error) {
       console.error('Error saving settings:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to save settings. Please try again.",
+      });
     } finally {
       setIsSaving(false);
     }
@@ -91,6 +116,11 @@ export default function SettingsPage() {
       router.push('/sign-in');
     } catch (error) {
       console.error('Error deleting account:', error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to delete account. Please try again.",
+      });
     } finally {
       setIsDeleting(false);
     }
@@ -111,7 +141,24 @@ export default function SettingsPage() {
         <div className="max-w-2xl mx-auto space-y-6">
           <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-          <div className="space-y-4 bg-white p-6 rounded-lg shadow">
+          <PersonalCard />
+
+          <div className="space-y-6 bg-white p-6 rounded-lg shadow">
+            <AvatarUpload
+              currentAvatarUrl={settings.avatar_url}
+              onUpload={(url) => setSettings({ ...settings, avatar_url: url })}
+            />
+
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                value={settings.username}
+                onChange={(e) => setSettings({ ...settings, username: e.target.value })}
+                placeholder="Your username"
+              />
+            </div>
+
             <div className="space-y-2">
               <Label htmlFor="bio">Bio</Label>
               <Textarea
@@ -124,7 +171,7 @@ export default function SettingsPage() {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="status">Status Message</Label>
+              <Label htmlFor="status">Status</Label>
               <div className="flex gap-2">
                 <Input
                   id="status"
@@ -138,27 +185,6 @@ export default function SettingsPage() {
                   onChange={(emoji) => setSettings({ ...settings, status_emoji: emoji })}
                 />
               </div>
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="avatar">Avatar URL</Label>
-              <Input
-                id="avatar"
-                value={settings.avatar_url || ""}
-                onChange={(e) => setSettings({ ...settings, avatar_url: e.target.value })}
-                placeholder="https://example.com/avatar.jpg"
-              />
-              {settings.avatar_url && (
-                <div className="mt-2">
-                  <Image
-                    src={settings.avatar_url}
-                    alt="Avatar preview"
-                    width={100}
-                    height={100}
-                    className="rounded-full"
-                  />
-                </div>
-              )}
             </div>
 
             <div className="flex justify-between items-center pt-4">
@@ -190,6 +216,7 @@ export default function SettingsPage() {
               <Button
                 onClick={handleSave}
                 disabled={isSaving}
+                className="bg-[#6F8FAF] hover:bg-[#5A7593]"
               >
                 {isSaving ? "Saving..." : "Save Changes"}
               </Button>
@@ -197,6 +224,7 @@ export default function SettingsPage() {
           </div>
         </div>
       </div>
+      <Toaster />
     </div>
   );
 }

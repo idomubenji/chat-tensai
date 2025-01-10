@@ -11,7 +11,7 @@ interface UserNameProps {
 export function UserName({ name, userId, role, className }: UserNameProps) {
   return (
     <div className={cn("flex items-center gap-2", className)}>
-      <span className="font-semibold text-sm text-gray-800">{name}</span>
+      <span className={cn("font-semibold", className)}>{name}</span>
       {role === 'ADMIN' && <AdminBadge />}
     </div>
   );
