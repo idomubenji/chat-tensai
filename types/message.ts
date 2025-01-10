@@ -18,5 +18,7 @@ export interface Message {
       users?: { name: string }[];
     };
   };
-  replies?: Message[];
+  replies?: {
+    count: number;
+  };
 } 

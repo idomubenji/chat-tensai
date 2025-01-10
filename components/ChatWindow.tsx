@@ -76,7 +76,7 @@ export function ChatWindow({
         avatar_url: null
       },
       reactions: {},
-      replies: []
+      replies: { count: 0 }
     };
 
     // Add optimistic message immediately
@@ -109,52 +109,92 @@ export function ChatWindow({
       if (!message) return;
 
       const existingReaction = message.reactions[emoji];
+      const action = existingReaction?.userIds.includes(userId || '') ? 'remove' : 'add';
+
+      // Apply optimistic update
       const updatedReactions = { ...message.reactions };
-      
-      if (existingReaction) {
-        // Toggle user's reaction
-        const userIndex = existingReaction.userIds.indexOf(userId || '');
-        if (userIndex >= 0) {
+      if (action === 'add') {
+        if (!updatedReactions[emoji]) {
           updatedReactions[emoji] = {
-            ...existingReaction,
-            userIds: existingReaction.userIds.filter(id => id !== userId)
+            emoji,
+            userIds: [],
+            users: []
           };
-          // Remove reaction if no users left
+        }
+        updatedReactions[emoji] = {
+          ...updatedReactions[emoji],
+          userIds: [...(updatedReactions[emoji]?.userIds || []), userId || ''],
+          users: [...(updatedReactions[emoji]?.users || []), { name: 'You' }]
+        };
+      } else {
+        if (updatedReactions[emoji]) {
+          const reaction = updatedReactions[emoji];
+          if (!reaction) return;
+          
+          updatedReactions[emoji] = {
+            ...reaction,
+            userIds: reaction.userIds?.filter(id => id !== userId) || [],
+            users: reaction.users?.filter(u => u.name !== 'You') || []
+          };
           if (updatedReactions[emoji].userIds.length === 0) {
             delete updatedReactions[emoji];
           }
-        } else {
-          updatedReactions[emoji] = {
-            ...existingReaction,
-            userIds: [...existingReaction.userIds, userId || '']
-          };
         }
-      } else {
-        // Add new reaction
-        updatedReactions[emoji] = {
-          emoji,
-          userIds: [userId || '']
-        };
       }
 
+      // Update state optimistically
+      handleReactionUpdate(messageId, updatedReactions);
+
       // Send update to server
-      const response = await fetch(`/api/channels/${channelId}/messages`, {
-        method: 'PUT',
+      const response = await fetch(`/api/channels/${channelId}/messages/${messageId}/reactions`, {
+        method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ 
-          messageId, 
           emoji,
-          action: existingReaction?.userIds.includes(userId || '') ? 'remove' : 'add'
+          action
         }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add reaction');
+        throw new Error('Failed to update reaction');
       }
     } catch (error) {
-      console.error('Error adding reaction:', error);
+      console.error('Error updating reaction:', error);
+      // Revert optimistic update on error by refetching the message
+      const supabase = createClientComponentClient<Database>();
+      const { data: message } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users(*),
+          reactions:message_reactions(
+            *,
+            user:users(*)
+          )
+        `)
+        .eq('id', messageId)
+        .single();
+
+      if (message) {
+        const formattedReactions = message.reactions.reduce((acc: any, reaction: any) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              userIds: [],
+              users: []
+            };
+          }
+          acc[reaction.emoji].userIds.push(reaction.user_id);
+          if (reaction.user) {
+            acc[reaction.emoji].users.push({ name: reaction.user.name });
+          }
+          return acc;
+        }, {});
+
+        handleReactionUpdate(messageId, formattedReactions);
+      }
     }
   };
 
@@ -171,21 +211,21 @@ export function ChatWindow({
   // Subscribe to reactions for all visible messages
   useEffect(() => {
     const supabase = createClientComponentClient<Database>();
-    const messageIds = messages.map(message => message.id);
+    const messageIds = messages.map(message => message.id).filter(Boolean);
     
     if (messageIds.length === 0) return;
 
-    type ReactionRecord = {
-      message_id: string;
-      user_id: string;
-      emoji: string;
+    type ReactionRecord = Database['public']['Tables']['message_reactions']['Row'];
+    
+    const isReactionRecord = (record: any): record is ReactionRecord => {
+      return record && typeof record.message_id === 'string';
     };
 
     // Create a single channel for all message reactions
     const channel = supabase
       .channel(`message-reactions-${channelId}`)
-      .on(
-        'postgres_changes' as const,
+      .on<ReactionRecord>(
+        'postgres_changes',
         {
           event: '*',
           schema: 'public',
@@ -194,24 +234,24 @@ export function ChatWindow({
         },
         async (payload: RealtimePostgresChangesPayload<ReactionRecord>) => {
           const record = payload.new || payload.old;
-          if (!record) return;
-
-          const messageId = (record as ReactionRecord).message_id;
-          if (!messageId) return;
+          if (!isReactionRecord(record)) return;
 
           // Fetch all reactions for this message
-          const { data: reactions } = await supabase
-            .from('message_reactions')
+          const { data: message } = await supabase
+            .from('messages')
             .select(`
-              *,
-              user:users(*)
+              reactions:message_reactions(
+                *,
+                user:users(*)
+              )
             `)
-            .eq('message_id', messageId);
+            .eq('id', record.message_id)
+            .single();
 
-          if (!reactions) return;
+          if (!message?.reactions) return;
 
           // Transform reactions into the expected format
-          const formattedReactions = reactions.reduce((acc: {
+          const formattedReactions = message.reactions.reduce((acc: {
             [key: string]: {
               emoji: string;
               userIds: string[];
@@ -233,13 +273,13 @@ export function ChatWindow({
             return acc;
           }, {});
 
-          handleReactionUpdate(messageId, formattedReactions);
+          handleReactionUpdate(record.message_id, formattedReactions);
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      channel.unsubscribe();
     };
   }, [messages, channelId, handleReactionUpdate]);
 
@@ -285,11 +325,17 @@ export function ChatWindow({
             }
             return acc;
           }, {}),
-          replies: []
+          replies: {
+            count: msg.replies?.count || 0
+          }
         }));
 
         // Debug log
-        console.log('Transformed messages:', transformedMessages);
+        console.log('Transformed messages:', {
+          count: transformedMessages.length,
+          firstMessage: transformedMessages[0],
+          replyCount: transformedMessages[0]?.replies?.count
+        });
 
         setMessages(transformedMessages);
       } catch (error) {
@@ -349,8 +395,17 @@ export function ChatWindow({
                 }
                 return acc;
               }, {}),
-              replies: []
+              replies: {
+                count: msg.replies?.count || 0
+              }
             }));
+
+            // Debug log for real-time updates
+            console.log('Real-time transformed messages:', {
+              count: transformedMessages.length,
+              firstMessage: transformedMessages[0],
+              replyCount: transformedMessages[0]?.replies?.count
+            });
 
             // Remove any optimistic messages when setting new messages
             setMessages(transformedMessages);
@@ -386,7 +441,11 @@ export function ChatWindow({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {messages.map((message) => {
           const isCurrentUser = message.user_id === userId;
-          const replyCount = message.replies?.length || 0;
+          console.log('Message replies:', {
+            messageId: message.id,
+            replyCount: message.replies?.count,
+            fullReplies: message.replies
+          });
 
           return (
             <div
@@ -466,6 +525,17 @@ export function ChatWindow({
                     />
                   </div>
                 </div>
+                {message.replies && message.replies.count > 0 && (
+                  <div
+                    onClick={() => handleSelectMessage(message)}
+                    className={cn(
+                      "text-sm text-blue-500 hover:underline cursor-pointer mt-1",
+                      isCurrentUser ? "pr-12" : "pl-12"
+                    )}
+                  >
+                    {message.replies.count} {message.replies.count === 1 ? 'reply' : 'replies'}
+                  </div>
+                )}
                 {Object.keys(message.reactions).length > 0 && (
                   <div className={cn(
                     "flex flex-wrap gap-1 mt-1",
@@ -478,17 +548,6 @@ export function ChatWindow({
                       align={isCurrentUser ? "start" : "end"}
                       reactions={message.reactions}
                     />
-                  </div>
-                )}
-                {replyCount > 0 && (
-                  <div
-                    onClick={() => handleSelectMessage(message)}
-                    className={cn(
-                      "text-sm text-blue-500 hover:underline mt-1 cursor-pointer",
-                      isCurrentUser ? "pr-12" : "pl-12"
-                    )}
-                  >
-                    {replyCount} {replyCount === 1 ? 'reply' : 'replies'}
                   </div>
                 )}
               </div>

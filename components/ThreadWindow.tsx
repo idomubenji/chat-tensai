@@ -79,7 +79,7 @@ export function ThreadWindow({
           }
           return acc;
         }, {}),
-        replies: []
+        replies: { count: 0 }
       };
 
       setParentMessage(transformedMessage);
@@ -116,7 +116,7 @@ export function ThreadWindow({
           avatar_url: reply.user.avatar_url,
           role: reply.user.role
         },
-        reactions: reply.reactions.reduce((acc: any, reaction: any) => {
+        reactions: (reply.reactions || []).reduce((acc: any, reaction: any) => {
           if (!acc[reaction.emoji]) {
             acc[reaction.emoji] = {
               emoji: reaction.emoji,
@@ -132,7 +132,7 @@ export function ThreadWindow({
           }
           return acc;
         }, {}),
-        replies: []
+        replies: { count: 0 }
       }));
 
       setReplies(transformedReplies);
@@ -144,6 +144,12 @@ export function ThreadWindow({
   // Subscribe to new replies
   useEffect(() => {
     const channel = supabase.channel(`thread:${messageId}`);
+
+    type ReactionRecord = Database['public']['Tables']['message_reactions']['Row'];
+    
+    const isReactionRecord = (record: any): record is ReactionRecord => {
+      return record && typeof record.message_id === 'string';
+    };
 
     channel
       .on<Database['public']['Tables']['messages']['Row']>(
@@ -203,7 +209,7 @@ export function ThreadWindow({
                 }
                 return acc;
               }, {}),
-              replies: []
+              replies: { count: 0 }
             };
 
             setReplies(prev => [...prev, transformedMessage]);
@@ -212,10 +218,126 @@ export function ThreadWindow({
       )
       .subscribe();
 
+    // Subscribe to reaction changes for parent message and replies
+    const reactionChannel = supabase.channel(`thread-reactions:${messageId}`);
+
+    reactionChannel
+      .on<ReactionRecord>(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reactions',
+          filter: `message_id=eq.${messageId}`,
+        },
+        async (payload: RealtimePostgresChangesPayload<ReactionRecord>) => {
+          const record = payload.new || payload.old;
+          if (!isReactionRecord(record)) return;
+
+          // Fetch updated parent message reactions
+          const { data: message } = await supabase
+            .from('messages')
+            .select(`
+              reactions:message_reactions(
+                *,
+                user:users(*)
+              )
+            `)
+            .eq('id', messageId)
+            .single();
+
+          if (!message?.reactions) return;
+
+          const updatedReactions = message.reactions.reduce((acc: any, reaction: any) => {
+            if (!acc[reaction.emoji]) {
+              acc[reaction.emoji] = {
+                emoji: reaction.emoji,
+                userIds: [],
+                users: []
+              };
+            }
+            acc[reaction.emoji].userIds.push(reaction.user_id);
+            if (reaction.user) {
+              acc[reaction.emoji].users.push({
+                name: reaction.user.name
+              });
+            }
+            return acc;
+          }, {});
+
+          setParentMessage(prev => prev ? {
+            ...prev,
+            reactions: updatedReactions
+          } : null);
+        }
+      )
+      .subscribe();
+
+    // Subscribe to reaction changes for replies
+    const repliesReactionChannel = supabase.channel(`thread-replies-reactions:${messageId}`);
+
+    repliesReactionChannel
+      .on<ReactionRecord>(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'message_reactions',
+          filter: `message_id=in.(${replies.map(r => r.id).join(',')})`,
+        },
+        async (payload: RealtimePostgresChangesPayload<ReactionRecord>) => {
+          const record = payload.new || payload.old;
+          if (!isReactionRecord(record)) return;
+
+          // Fetch updated message reactions
+          const { data: message } = await supabase
+            .from('messages')
+            .select(`
+              reactions:message_reactions(
+                *,
+                user:users(*)
+              )
+            `)
+            .eq('id', record.message_id)
+            .single();
+
+          if (!message?.reactions) return;
+
+          const updatedReactions = message.reactions.reduce((acc: any, reaction: any) => {
+            if (!acc[reaction.emoji]) {
+              acc[reaction.emoji] = {
+                emoji: reaction.emoji,
+                userIds: [],
+                users: []
+              };
+            }
+            acc[reaction.emoji].userIds.push(reaction.user_id);
+            if (reaction.user) {
+              acc[reaction.emoji].users.push({
+                name: reaction.user.name
+              });
+            }
+            return acc;
+          }, {});
+
+          setReplies(prev => 
+            prev.map(reply => 
+              reply.id === record.message_id ? {
+                ...reply,
+                reactions: updatedReactions
+              } : reply
+            )
+          );
+        }
+      )
+      .subscribe();
+
     return () => {
       channel.unsubscribe();
+      reactionChannel.unsubscribe();
+      repliesReactionChannel.unsubscribe();
     };
-  }, [messageId, supabase]);
+  }, [messageId, supabase, replies]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -246,71 +368,121 @@ export function ThreadWindow({
 
   const handleReactionSelect = useCallback(async (messageId: string, emoji: string) => {
     try {
-      const response = await fetch(`/api/channels/${parentMessage?.channel_id}/messages/${messageId}/reactions`, {
+      const message = messageId === parentMessage?.id ? parentMessage : replies.find(r => r.id === messageId);
+      if (!message) return;
+
+      const existingReaction = message.reactions[emoji];
+      const action = existingReaction?.userIds.includes(userId || '') ? 'remove' : 'add';
+
+      // Apply optimistic update
+      const updatedReactions = { ...message.reactions };
+      if (action === 'add') {
+        if (!updatedReactions[emoji]) {
+          updatedReactions[emoji] = {
+            emoji,
+            userIds: [],
+            users: []
+          };
+        }
+        updatedReactions[emoji] = {
+          ...updatedReactions[emoji],
+          userIds: [...(updatedReactions[emoji]?.userIds || []), userId || ''],
+          users: [...(updatedReactions[emoji]?.users || []), { name: 'You' }]
+        };
+      } else {
+        if (updatedReactions[emoji]) {
+          const reaction = updatedReactions[emoji];
+          if (!reaction) return;
+          
+          updatedReactions[emoji] = {
+            ...reaction,
+            userIds: reaction.userIds?.filter(id => id !== userId) || [],
+            users: reaction.users?.filter(u => u.name !== 'You') || []
+          };
+          if (updatedReactions[emoji].userIds.length === 0) {
+            delete updatedReactions[emoji];
+          }
+        }
+      }
+
+      // Update state optimistically
+      if (messageId === parentMessage?.id) {
+        setParentMessage(prev => prev ? {
+          ...prev,
+          reactions: updatedReactions
+        } : null);
+      } else {
+        setReplies(prev => prev.map(reply => 
+          reply.id === messageId
+            ? { ...reply, reactions: updatedReactions }
+            : reply
+        ));
+      }
+
+      // Send update to server
+      const response = await fetch(`/api/channels/${message.channel_id}/messages/${messageId}/reactions`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ emoji }),
+        body: JSON.stringify({ 
+          emoji,
+          action
+        }),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to add reaction');
+        throw new Error('Failed to update reaction');
       }
 
-      const reactions = await response.json();
+      // Real-time subscription will handle syncing the final state
+    } catch (error) {
+      console.error('Error updating reaction:', error);
+      // Revert optimistic update on error by refetching the message
+      const { data: message } = await supabase
+        .from('messages')
+        .select(`
+          *,
+          user:users(*),
+          reactions:message_reactions(
+            *,
+            user:users(*)
+          )
+        `)
+        .eq('id', messageId)
+        .single();
 
-      // Update reactions in state
-      if (messageId === parentMessage?.id) {
-        setParentMessage(prev => prev ? {
-          ...prev,
-          reactions: reactions.reduce((acc: any, reaction: any) => {
-            if (!acc[reaction.emoji]) {
-              acc[reaction.emoji] = {
-                emoji: reaction.emoji,
-                userIds: [],
-                users: []
-              };
-            }
-            acc[reaction.emoji].userIds.push(reaction.user_id);
-            if (reaction.user) {
-              acc[reaction.emoji].users.push({
-                name: reaction.user.name
-              });
-            }
-            return acc;
-          }, {})
-        } : null);
-      } else {
-        setReplies(prev => prev.map(reply => {
-          if (reply.id === messageId) {
-            return {
-              ...reply,
-              reactions: reactions.reduce((acc: any, reaction: any) => {
-                if (!acc[reaction.emoji]) {
-                  acc[reaction.emoji] = {
-                    emoji: reaction.emoji,
-                    userIds: [],
-                    users: []
-                  };
-                }
-                acc[reaction.emoji].userIds.push(reaction.user_id);
-                if (reaction.user) {
-                  acc[reaction.emoji].users.push({
-                    name: reaction.user.name
-                  });
-                }
-                return acc;
-              }, {})
+      if (message) {
+        const formattedReactions = message.reactions.reduce((acc: any, reaction: any) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              userIds: [],
+              users: []
             };
           }
-          return reply;
-        }));
+          acc[reaction.emoji].userIds.push(reaction.user_id);
+          if (reaction.user) {
+            acc[reaction.emoji].users.push({ name: reaction.user.name });
+          }
+          return acc;
+        }, {});
+
+        if (messageId === parentMessage?.id) {
+          setParentMessage(prev => prev ? {
+            ...prev,
+            reactions: formattedReactions
+          } : null);
+        } else {
+          setReplies(prev => prev.map(reply => 
+            reply.id === messageId
+              ? { ...reply, reactions: formattedReactions }
+              : reply
+          ));
+        }
       }
-    } catch (error) {
-      console.error('Error adding reaction:', error);
     }
-  }, [parentMessage]);
+  }, [parentMessage, replies, userId, supabase]);
 
   const renderMessage = (message: Message, isParent: boolean = false) => {
     const isCurrentUser = message.user_id === userId;
@@ -372,20 +544,10 @@ export function ThreadWindow({
                       ? "bg-pink-200 text-gray-900"
                       : "bg-[#223344] text-white"
                   )}
-                  onClick={() => !isParent && setReplyingTo(message)}
                 >
                   {message.content}
-                  {replyingTo?.id === message.id && (
-                    <div className="text-xs text-blue-500 mt-1">Replying to this message</div>
-                  )}
                 </div>
                 <div className="flex items-center gap-1">
-                  {isCurrentUser && (
-                    <MessageReplyButton
-                      onClick={() => !isParent && setReplyingTo(message)}
-                      align="start"
-                    />
-                  )}
                   <MessageReactions
                     messageId={message.id}
                     currentUserId={userId || ''}
@@ -394,12 +556,6 @@ export function ThreadWindow({
                     reactions={message.reactions}
                     showButton
                   />
-                  {!isCurrentUser && (
-                    <MessageReplyButton
-                      onClick={() => !isParent && setReplyingTo(message)}
-                      align="end"
-                    />
-                  )}
                 </div>
               </div>
               {Object.keys(message.reactions).length > 0 && (

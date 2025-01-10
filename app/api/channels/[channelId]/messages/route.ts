@@ -42,9 +42,11 @@ export async function GET(
           *,
           user:users(*)
         ),
-        files(*)
+        files(*),
+        replies:messages!parent_id(id)
       `)
       .eq('channel_id', params.channelId)
+      .is('parent_id', null)
       .order('created_at', { ascending: true })
       .limit(limit);
 
@@ -56,7 +58,27 @@ export async function GET(
 
     if (messagesError) throw messagesError;
 
-    return NextResponse.json(messages);
+    // Transform messages to include reply count
+    const transformedMessages = messages?.map(message => ({
+      ...message,
+      replies: {
+        count: Array.isArray(message.replies) ? message.replies.length : 0
+      }
+    }));
+
+    // Debug logging
+    console.log('Messages query result:', {
+      count: transformedMessages?.length,
+      firstMessage: transformedMessages?.[0],
+      error: messagesError,
+      replyCounts: transformedMessages?.map(m => ({
+        messageId: m.id,
+        replyCount: m.replies?.count,
+        fullReplies: m.replies
+      }))
+    });
+
+    return NextResponse.json(transformedMessages);
   } catch (error) {
     console.error('Error fetching messages:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
