@@ -12,6 +12,12 @@ jobs:
       NODE_OPTIONS: --max_old_space_size=4096
       NEXT_DISABLE_ESLINT: 1
       NEXT_DISABLE_TYPE_CHECKS: 1
+      NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+      NEXT_PUBLIC_PRODUCTION_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
+      NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
+      PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
     
     steps:
       - uses: actions/checkout@v3
@@ -65,8 +71,9 @@ jobs:
               git clone ${{ secrets.REPO_URL }} .
             fi
             
-            # Copy env file
+            # Copy env file and ensure it's loaded
             cp ~/.env.production .env.production
+            source .env.production
             
             # Run deployment
             chmod +x scripts/deploy.sh

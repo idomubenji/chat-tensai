@@ -4,7 +4,14 @@
 set -e
 
 # Load environment variables
+set -a # automatically export all variables
 source .env.production
+set +a
+
+# Print environment variables for debugging (excluding sensitive data)
+echo "Checking environment variables:"
+echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL is set: $(if [ -n "$NEXT_PUBLIC_PRODUCTION_SUPABASE_URL" ]; then echo "yes"; else echo "no"; fi)"
+echo "NEXT_PUBLIC_SUPABASE_URL is set: $(if [ -n "$NEXT_PUBLIC_SUPABASE_URL" ]; then echo "yes"; else echo "no"; fi)"
 
 # Install dependencies
 npm install
