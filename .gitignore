@@ -17,6 +17,7 @@ node-installer/
 .env.development
 .env.test
 .env.production
+.jest/
 
 # Next.js
 /.next/

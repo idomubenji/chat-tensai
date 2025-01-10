@@ -28,24 +28,12 @@ export interface Database {
           id: string
           name: string
           description: string | null
-          is_private: boolean
           created_by_id: string
           created_at: string
           updated_at: string
         }
         Insert: Omit<Database['public']['Tables']['channels']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['channels']['Insert']>
-      }
-      channel_members: {
-        Row: {
-          id: string
-          channel_id: string
-          user_id: string
-          role_in_channel: 'ADMIN' | 'MEMBER'
-          joined_at: string
-        }
-        Insert: Omit<Database['public']['Tables']['channel_members']['Row'], 'joined_at'>
-        Update: Partial<Database['public']['Tables']['channel_members']['Insert']>
       }
       messages: {
         Row: {
@@ -91,7 +79,6 @@ export interface Database {
     Enums: {
       user_status: 'ONLINE' | 'OFFLINE' | 'AWAY'
       user_role: 'ADMIN' | 'USER'
-      channel_role: 'ADMIN' | 'MEMBER'
     }
   }
 } 

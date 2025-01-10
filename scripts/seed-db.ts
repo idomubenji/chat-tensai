@@ -178,36 +178,6 @@ async function main() {
       console.log('#general channel already exists with ID:', generalChannel.id);
     }
 
-    // Add all users to general channel
-    console.log('\nAdding users to #general...');
-    for (const user of animeUsers) {
-      const { data: membership, error: membershipError } = await supabase
-        .from('channel_members')
-        .select()
-        .eq('channel_id', generalChannel.id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (membershipError && membershipError.code !== 'PGRST116') {
-        throw membershipError;
-      }
-
-      if (!membership) {
-        const { error: joinError } = await supabase
-          .from('channel_members')
-          .insert({
-            channel_id: generalChannel.id,
-            user_id: user.id,
-            role_in_channel: user.id === `${DEV_PREFIX}bot` ? 'ADMIN' : 'MEMBER'
-          });
-
-        if (joinError) throw joinError;
-        console.log(`Added ${user.name} to #general`);
-      } else {
-        console.log(`${user.name} is already in #general`);
-      }
-    }
-
     // Add messages
     console.log('\nAdding messages to #general...');
     for (const message of animeMessages) {
@@ -249,48 +219,26 @@ async function main() {
     console.log('\n=== Verifying database state ===');
     
     // Check users
-    const { data: finalUsers, error: usersError } = await supabase
+    const { data: users, error: usersError } = await supabase
       .from('users')
       .select('*')
-      .order('created_at', { ascending: true });
+      .like('id', `${DEV_PREFIX}%`);
     
     if (usersError) throw usersError;
-    console.log(`\nFound ${finalUsers.length} users:`);
-    finalUsers.forEach(user => {
-      console.log(`- ${user.name} (${user.id})`);
-    });
-
-    // Check channels
-    const { data: finalChannels, error: channelsError } = await supabase
-      .from('channels')
-      .select('*')
-      .order('created_at', { ascending: true });
-    
-    if (channelsError) throw channelsError;
-    console.log(`\nFound ${finalChannels.length} channels:`);
-    finalChannels.forEach(channel => {
-      console.log(`- ${channel.name} (${channel.id})`);
-    });
+    console.log(`\nFound ${users.length} development users`);
 
     // Check messages
-    const { data: finalMessages, error: messagesError } = await supabase
+    const { data: messages, error: messagesError } = await supabase
       .from('messages')
-      .select(`
-        *,
-        user:users!inner(name),
-        channel:channels!inner(name)
-      `)
-      .order('created_at', { ascending: true });
-    
+      .select('*, user:users(*)')
+      .eq('channel_id', generalChannel.id);
+
     if (messagesError) throw messagesError;
-    console.log(`\nFound ${finalMessages.length} messages:`);
-    finalMessages.forEach(msg => {
-      console.log(`- [${msg.channel.name}] ${msg.user.name}: ${msg.content.slice(0, 50)}...`);
-    });
+    console.log(`Found ${messages.length} messages in #general`);
 
     console.log('\n=== Database seeding completed successfully! ===');
   } catch (error) {
-    console.error('\nError:', error);
+    console.error('Error:', error);
     process.exit(1);
   }
 }

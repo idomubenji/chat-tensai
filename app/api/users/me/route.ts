@@ -112,14 +112,6 @@ export async function DELETE() {
 
     if (messagesError) throw messagesError;
 
-    // Delete all user's channel memberships
-    const { error: membershipError } = await supabase
-      .from('channel_members')
-      .delete()
-      .eq('user_id', userId);
-
-    if (membershipError) throw membershipError;
-
     // Finally, delete the user
     const { error: userError } = await supabase
       .from('users')

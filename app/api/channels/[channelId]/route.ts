@@ -16,24 +16,19 @@ export async function PATCH(
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Check if user is a member of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
+    // Check if user is an admin
+    const { data: user, error: userError } = await supabase
+      .from('users')
       .select('role')
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single();
 
-    if (membershipError) {
-      return new NextResponse('Channel not found', { status: 404 });
-    }
-
-    if (membership.role !== 'ADMIN') {
+    if (userError || user.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 });
     }
 
     const body = await req.json();
-    const { name, description, is_private } = body;
+    const { name, description } = body;
 
     if (!name?.trim()) {
       return new NextResponse('Channel name is required', { status: 400 });
@@ -45,7 +40,6 @@ export async function PATCH(
       .update({
         name,
         description,
-        is_private,
         updated_at: new Date().toISOString()
       })
       .eq('id', params.channelId)
@@ -73,19 +67,14 @@ export async function DELETE(
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Check if user is an admin of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
+    // Check if user is an admin
+    const { data: user, error: userError } = await supabase
+      .from('users')
       .select('role')
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single();
 
-    if (membershipError) {
-      return new NextResponse('Channel not found', { status: 404 });
-    }
-
-    if (membership.role !== 'ADMIN') {
+    if (userError || user.role !== 'ADMIN') {
       return new NextResponse('Forbidden', { status: 403 });
     }
 

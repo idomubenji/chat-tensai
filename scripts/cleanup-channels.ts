@@ -61,15 +61,6 @@ async function main() {
       if (messageUpdateError) throw messageUpdateError;
       console.log(`Moved messages from channel ${dupChannel.id} to ${keepChannel.id}`);
 
-      // Delete existing memberships for the kept channel to avoid conflicts
-      const { error: membershipDeleteError } = await supabase
-        .from('channel_members')
-        .delete()
-        .eq('channel_id', dupChannel.id);
-
-      if (membershipDeleteError) throw membershipDeleteError;
-      console.log(`Deleted memberships from channel ${dupChannel.id}`);
-
       // Delete the duplicate channel
       const { error: deleteError } = await supabase
         .from('channels')

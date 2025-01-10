@@ -92,7 +92,6 @@ export async function POST(req: Request) {
           .insert({
             name: 'general',
             description: 'General discussion',
-            is_private: false,
             created_by_id: userId
           })
           .select()
@@ -103,29 +102,7 @@ export async function POST(req: Request) {
           throw createError;
         }
 
-        channels = [generalChannel];
         console.log('Created general channel:', generalChannel);
-      }
-
-      console.log('Adding user to channels:', channels);
-
-      // Add user to each channel
-      for (const channel of channels) {
-        const { error: addError } = await supabase
-          .from('channel_members')
-          .insert({
-            channel_id: channel.id,
-            user_id: userId,
-            role_in_channel: 'MEMBER'
-          })
-          .select()
-          .single();
-
-        if (addError) {
-          console.error(`Error adding user ${userId} to channel ${channel.id}:`, addError);
-        } else {
-          console.log(`Added user ${userId} to channel ${channel.id}`);
-        }
       }
     }
 

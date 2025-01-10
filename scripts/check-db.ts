@@ -52,22 +52,6 @@ async function main() {
       console.log(`- ${channel.name} (${channel.id})`);
     });
 
-    // Check channel members
-    console.log('\nChecking channel members...');
-    const { data: members, error: membersError } = await supabase
-      .from('channel_members')
-      .select(`
-        *,
-        channel:channels!inner(*),
-        user:users!inner(*)
-      `);
-    
-    if (membersError) throw membersError;
-    console.log(`Found ${members.length} channel memberships:`);
-    members.forEach(member => {
-      console.log(`- ${member.user.name} in ${member.channel.name} (${member.role_in_channel})`);
-    });
-
     // Check messages
     console.log('\nChecking messages...');
     const { data: messages, error: messagesError } = await supabase

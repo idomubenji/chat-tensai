@@ -74,26 +74,15 @@ export async function checkChannelExists(channelId: string) {
  * Check if a user is a member of a channel
  * @param channelId The channel ID to check
  * @param userId The user ID to check
- * @returns The membership if it exists, null otherwise
+ * @returns true if the user is authenticated and the channel exists, false otherwise
  */
-export async function checkChannelMembership(channelId: string, userId: string) {
+export async function checkChannelMembership(channelId: string, userId: string): Promise<boolean> {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { data: membership, error } = await supabase
-      .from('channel_members')
-      .select()
-      .eq('channel_id', channelId)
-      .eq('user_id', userId)
-      .single();
-
-    if (error) {
-      console.error('Membership check error:', error);
-      return null;
-    }
-
-    return membership;
+    // If user is authenticated and channel exists, they have access
+    const channel = await checkChannelExists(channelId);
+    return !!channel && !!userId;
   } catch (error) {
     console.error('Error in checkChannelMembership:', error);
-    return null;
+    return false;
   }
 } 

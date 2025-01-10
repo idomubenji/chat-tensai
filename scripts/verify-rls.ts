@@ -22,7 +22,7 @@ async function main() {
 
     // Check RLS is enabled on all tables
     console.log('Checking RLS status...');
-    const tables = ['users', 'channels', 'channel_members', 'messages', 'message_reactions', 'files'];
+    const tables = ['users', 'channels', 'messages', 'message_reactions', 'files'];
     for (const table of tables) {
       const { data: enabled, error } = await supabase.rpc('check_rls_enabled', { table_name: table });
       if (error) throw error;
@@ -65,19 +65,6 @@ async function main() {
 
     if (userError) throw userError;
     console.log('Verified user record:', user);
-
-    // Verify channel membership
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
-      .select('*')
-      .eq('user_id', authUser.user.id)
-      .single();
-
-    if (membershipError) {
-      console.log('No channel membership found:', membershipError);
-    } else {
-      console.log('Verified channel membership:', membership);
-    }
 
     // Clean up test user
     await supabase.auth.admin.deleteUser(authUser.user.id);

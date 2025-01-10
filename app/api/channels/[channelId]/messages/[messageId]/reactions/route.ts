@@ -16,18 +16,6 @@ export async function GET(
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Check if user is a member of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
-      .select()
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
-      .single();
-
-    if (membershipError) {
-      return new NextResponse('Channel not found', { status: 404 });
-    }
-
     // Get reactions for the message
     const { data: reactions, error: reactionsError } = await supabase
       .from('message_reactions')
@@ -57,18 +45,6 @@ export async function POST(
     }
 
     const supabase = createRouteHandlerClient<Database>({ cookies });
-
-    // Check if user is a member of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
-      .select()
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
-      .single();
-
-    if (membershipError) {
-      return new NextResponse('Channel not found', { status: 404 });
-    }
 
     const body = await req.json();
     const { emoji } = body;

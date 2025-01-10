@@ -3,7 +3,6 @@ import type { Database } from '@/types/supabase';
 
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type User = Database['public']['Tables']['users']['Row'];
-export type ChannelMember = Database['public']['Tables']['channel_members']['Row'];
 
 export type RealtimeMessage = Message & {
   user: User;

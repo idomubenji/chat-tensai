@@ -1,15 +1,18 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { TopBar } from "@/components/TopBar";
 import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useRouter } from "next/navigation";
 import { LoadingBall } from "@/components/ui/loading";
 import { Sidebar } from "@/components/Sidebar";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/types/supabase';
 
 export default function Home() {
   const { isLoaded, userId } = useSupabaseAuth();
   const router = useRouter();
+  const [isCheckingChannels, setIsCheckingChannels] = useState(true);
 
   useEffect(() => {
     if (isLoaded && !userId) {
@@ -17,7 +20,40 @@ export default function Home() {
     }
   }, [isLoaded, userId, router]);
 
-  if (!isLoaded) {
+  useEffect(() => {
+    async function checkChannelAccess() {
+      if (!userId) return;
+
+      try {
+        const supabase = createClientComponentClient<Database>();
+        const { data: channels, error } = await supabase
+          .from('channels')
+          .select('id')
+          .limit(1);
+
+        if (error) {
+          console.error('Error checking channels:', error);
+          return;
+        }
+
+        setIsCheckingChannels(false);
+
+        // If user has no access to any channels, redirect to sign-in
+        if (!channels || channels.length === 0) {
+          router.replace('/sign-in');
+        }
+      } catch (error) {
+        console.error('Error checking channel access:', error);
+        setIsCheckingChannels(false);
+      }
+    }
+
+    if (userId) {
+      checkChannelAccess();
+    }
+  }, [userId, router]);
+
+  if (!isLoaded || isCheckingChannels) {
     return (
       <div className="h-full w-full flex items-center justify-center">
         <LoadingBall />

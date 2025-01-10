@@ -104,30 +104,6 @@ export const getChannelMessages = async (channelId: string) => {
   return data;
 };
 
-// Channel member operations
-export const addChannelMember = async (memberData: Database['public']['Tables']['channel_members']['Insert']) => {
-  const supabase = createSupabaseClient();
-  const { data, error } = await supabase
-    .from('channel_members')
-    .insert(memberData)
-    .select()
-    .single();
-  
-  if (error) throw error;
-  return data;
-};
-
-export const getChannelMembers = async (channelId: string) => {
-  const supabase = createSupabaseClient();
-  const { data, error } = await supabase
-    .from('channel_members')
-    .select('*, user:users(*)')
-    .eq('channel_id', channelId);
-  
-  if (error) throw error;
-  return data;
-};
-
 // Message reaction operations
 export const addReaction = async (reactionData: Database['public']['Tables']['message_reactions']['Insert']) => {
   const supabase = createSupabaseClient();

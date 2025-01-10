@@ -156,8 +156,30 @@ export function ChatWindow({
         if (!response.ok) {
           throw new Error('Failed to fetch messages');
         }
-        const data = await response.json();
-        setMessages(data.messages);
+        const messages = await response.json();
+        
+        // Transform the messages to match our expected format
+        const transformedMessages = messages.map((msg: any) => ({
+          id: msg.id,
+          content: msg.content,
+          userId: msg.user_id,
+          userName: msg.user?.name || 'Unknown User',
+          userRole: msg.user?.role,
+          createdAt: msg.created_at,
+          reactions: (msg.reactions || []).reduce((acc: any, reaction: any) => {
+            if (!acc[reaction.emoji]) {
+              acc[reaction.emoji] = {
+                emoji: reaction.emoji,
+                userIds: []
+              };
+            }
+            acc[reaction.emoji].userIds.push(reaction.user_id);
+            return acc;
+          }, {}),
+          replies: [] // TODO: Implement replies
+        }));
+
+        setMessages(transformedMessages);
       } catch (error) {
         console.error('Error fetching messages:', error);
       } finally {

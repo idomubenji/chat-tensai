@@ -136,36 +136,6 @@ async function main() {
       throw channelError;
     }
 
-    // Add all anime users to #general
-    console.log('\nAdding users to #general...');
-    for (const user of animeUsers) {
-      const { data: membership, error: membershipError } = await supabase
-        .from('channel_members')
-        .select()
-        .eq('channel_id', channel.id)
-        .eq('user_id', user.id)
-        .single();
-
-      if (membershipError && membershipError.code !== 'PGRST116') {
-        throw membershipError;
-      }
-
-      if (!membership) {
-        const { error: joinError } = await supabase
-          .from('channel_members')
-          .insert({
-            channel_id: channel.id,
-            user_id: user.id,
-            role_in_channel: 'MEMBER'
-          });
-
-        if (joinError) throw joinError;
-        console.log(`Added ${user.name} to #general`);
-      } else {
-        console.log(`${user.name} is already in #general`);
-      }
-    }
-
     // Add anime messages
     console.log('\nAdding anime discussion messages...');
     for (const message of animeMessages) {

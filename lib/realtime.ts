@@ -4,7 +4,6 @@ import { RealtimeChannel, RealtimePostgresChangesPayload } from '@supabase/supab
 
 export type Message = Database['public']['Tables']['messages']['Row'];
 export type User = Database['public']['Tables']['users']['Row'];
-export type ChannelMember = Database['public']['Tables']['channel_members']['Row'];
 
 export type RealtimeMessage = Message & {
   user: User;
@@ -34,21 +33,6 @@ export class RealtimeSubscription {
           event: '*',
           schema: 'public',
           table: 'Message',
-          filter: `channelId=eq.${channelId}`,
-        },
-        callback
-      )
-      .subscribe();
-  }
-
-  subscribeToChannelMembers(channelId: string, callback: RealtimeCallback<ChannelMember>) {
-    return this.channel
-      .on<ChannelMember>(
-        'postgres_changes' as any,
-        {
-          event: '*',
-          schema: 'public',
-          table: 'ChannelMember',
           filter: `channelId=eq.${channelId}`,
         },
         callback

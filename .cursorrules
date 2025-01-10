@@ -26,12 +26,27 @@
       "requireEnvironmentAnnouncement": true,
       "enforceEnvironmentParity": true,
       "documentation": "For detailed environment setup and management, refer to docs/chat-tensai-obsidian/RLS-and-Environment-Setup.md"
+    },
+    "databaseSchema": {
+      "rule": "When checking database schema, always review migrations in chronological order from newest to oldest. The most recent migration takes precedence over older ones. Current schema state is determined by the cumulative effect of all migrations, with newer migrations potentially modifying or removing elements from older ones.",
+      "migrationPath": "supabase/migrations",
+      "schemaValidation": {
+        "checkMigrationOrder": true,
+        "prioritizeRecentMigrations": true
+      }
     }
   },
   "taskSpecificRules": {
     "codeGeneration": {
       "usePRD": true,
       "instruction": "Always consult the PRD at 'docs/chat-genius-prd.md' for context when generating or modifying code. Ensure features match the described requirements. Let me know if you see an issue with this code before proceeding."
+    },
+    "supabaseReset": {
+      "workflow": [
+        "Run supabase db reset",
+        "Run npx ts-node scripts/seed-db.ts"
+      ],
+      "instruction": "When asked to reset Supabase, always follow this exact workflow in sequence, no additional steps unless specifically requested."
     }
   }
 }

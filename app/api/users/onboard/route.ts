@@ -8,6 +8,8 @@ export async function POST(request: Request) {
     const { userId, email, username } = await request.json();
     const supabase = createRouteHandlerClient<Database>({ cookies });
 
+    console.log('Starting onboarding for user:', { userId, email, username });
+
     // First, check if user exists
     const { data: existingUser, error: fetchError } = await supabase
       .from('users')
@@ -16,6 +18,7 @@ export async function POST(request: Request) {
       .single();
 
     if (fetchError && fetchError.code !== 'PGRST116') { // PGRST116 is "not found"
+      console.error('Error checking for existing user:', fetchError);
       throw fetchError;
     }
 
@@ -40,37 +43,6 @@ export async function POST(request: Request) {
       }
     }
 
-    // Get all channels
-    const { data: channels, error: channelsError } = await supabase
-      .from('channels')
-      .select('id');
-
-    if (channelsError) {
-      console.error('Error fetching channels:', channelsError);
-      throw channelsError;
-    }
-
-    // Add user to all channels
-    console.log('Adding user to channels:', channels);
-    const channelMemberships = channels.map(channel => ({
-      channel_id: channel.id,
-      user_id: userId,
-      role_in_channel: 'MEMBER'
-    }));
-
-    if (channelMemberships.length > 0) {
-      const { error: membershipError } = await supabase
-        .from('channel_members')
-        .upsert(channelMemberships, {
-          onConflict: 'user_id,channel_id'
-        });
-
-      if (membershipError) {
-        console.error('Error adding user to channels:', membershipError);
-        throw membershipError;
-      }
-    }
-
     // Get the updated user data
     const { data: user, error: userError } = await supabase
       .from('users')
@@ -79,9 +51,11 @@ export async function POST(request: Request) {
       .single();
 
     if (userError) {
+      console.error('Error fetching updated user:', userError);
       throw userError;
     }
 
+    console.log('Onboarding completed successfully for user:', userId);
     return NextResponse.json(user);
   } catch (error) {
     console.error('Error in onboarding:', error);
