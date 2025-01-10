@@ -10,7 +10,10 @@ source .env.production
 npm install
 
 # Build the application with type checking and linting disabled
-NODE_OPTIONS="--max_old_space_size=4096" next build --no-lint --no-typescript
+export NODE_OPTIONS="--max_old_space_size=4096"
+export NEXT_DISABLE_ESLINT=1
+export NEXT_DISABLE_TYPE_CHECKS=1
+npm run build
 
 # Start/Restart with PM2
 if pm2 list | grep -q "chat-genius"; then
