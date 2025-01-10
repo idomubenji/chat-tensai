@@ -17,6 +17,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { Toaster } from "@/components/ui/toaster";
 import { mutate } from 'swr';
 import { USER_DATA_KEY } from '@/components/PersonalCard';
+import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
 
 interface UserSettings {
   bio: string;
@@ -57,7 +58,7 @@ export default function SettingsPage() {
           status_message: data.status_message || "",
           status_emoji: data.status_emoji || "",
           avatar_url: data.avatar_url,
-          username: user?.user_metadata?.username || "",
+          username: data.name || user?.user_metadata?.username || "",
         });
       } catch (error) {
         console.error('Error fetching user settings:', error);
@@ -86,6 +87,7 @@ export default function SettingsPage() {
           bio: settings.bio,
           status_message: settings.status_message,
           status_emoji: settings.status_emoji,
+          name: settings.username,
         }),
       });
 
@@ -94,6 +96,22 @@ export default function SettingsPage() {
       }
 
       const updatedData = await response.json();
+      
+      // Update user metadata in Supabase auth
+      const supabase = createClientComponentClient();
+      await supabase.auth.updateUser({
+        data: { username: settings.username }
+      });
+      
+      // Update local state with the response data
+      setSettings(prevSettings => ({
+        ...prevSettings,
+        bio: updatedData.bio || "",
+        status_message: updatedData.status_message || "",
+        status_emoji: updatedData.status_emoji || "",
+        avatar_url: updatedData.avatar_url,
+        username: updatedData.name || "",
+      }));
       
       // Trigger revalidation of the user data
       await mutate(USER_DATA_KEY, updatedData, false);

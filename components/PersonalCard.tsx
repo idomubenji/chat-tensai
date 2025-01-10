@@ -62,7 +62,7 @@ export function PersonalCard({ className }: PersonalCardProps) {
       </div>
       <div className="flex flex-col gap-3">
         <UserName 
-          name={user.user_metadata?.username || user.email || 'Anonymous'} 
+          name={userData?.name || user.email || 'Anonymous'} 
           userId={user.id} 
           role={user.user_metadata?.role}
           className="text-2xl font-bold text-gray-100"

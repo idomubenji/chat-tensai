@@ -44,7 +44,7 @@ export async function PATCH(req: Request) {
     }
 
     const body = await req.json();
-    const { bio, status_message, status_emoji, avatar_url } = body;
+    const { bio, status_message, status_emoji, avatar_url, name } = body;
 
     // Validate status message length
     if (status_message && status_message.length > 25) {
@@ -56,7 +56,8 @@ export async function PATCH(req: Request) {
       bio,
       status_message,
       status_emoji,
-      avatar_url
+      avatar_url,
+      name
     });
 
     // Initialize Supabase client
@@ -70,6 +71,7 @@ export async function PATCH(req: Request) {
         status_message,
         status_emoji,
         avatar_url,
+        name,
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)

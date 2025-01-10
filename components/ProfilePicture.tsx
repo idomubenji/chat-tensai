@@ -27,15 +27,15 @@ const borderWidthClasses = {
   thick: 'border-4',
 };
 
+// Key for the user data SWR cache
+export const USER_DATA_KEY = '/api/users/me';
+
 // Fetch function that SWR will use
 const fetcher = async (url: string) => {
   const res = await fetch(url);
   if (!res.ok) throw new Error('Failed to fetch user data');
   const data = await res.json();
-  // Return the avatar_url from the response data
-  return data.avatar_url && !data.avatar_url.includes('img.clerk.com')
-    ? data.avatar_url
-    : '/default-avatar.jpeg';
+  return data;
 };
 
 export function ProfilePicture({ 
@@ -48,19 +48,20 @@ export function ProfilePicture({
   shouldFetch = false,
 }: ProfilePictureProps) {
   // Only fetch if shouldFetch is true and no avatarUrl is provided
-  const { data: fetchedAvatarUrl, error } = useSWR(
-    shouldFetch && !avatarUrl ? '/api/users/me' : null,
+  const { data: userData, error } = useSWR(
+    shouldFetch ? USER_DATA_KEY : null,
     fetcher,
     {
       revalidateOnFocus: true,
       revalidateOnReconnect: true,
       refreshInterval: 30000,
-      dedupingInterval: 5000,
+      dedupingInterval: 2000,
+      revalidateOnMount: true,
     }
   );
 
-  const finalAvatarUrl = avatarUrl || fetchedAvatarUrl || "/default-avatar.jpeg";
-  const showLoading = isLoading || (shouldFetch && !fetchedAvatarUrl && !error);
+  const finalAvatarUrl = avatarUrl || userData?.avatar_url || "/default-avatar.jpeg";
+  const showLoading = isLoading || (shouldFetch && !userData && !error);
 
   return (
     <div className={cn("relative", sizeClasses[size], className)}>
