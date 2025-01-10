@@ -28,6 +28,9 @@ jobs:
           echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> .env.production
           echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> .env.production
           echo "PRODUCTION_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> .env.production
+          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> .env.production
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> .env.production
+          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> .env.production
           echo "NODE_OPTIONS=--max_old_space_size=4096" >> .env.production
           echo "NEXT_DISABLE_ESLINT=1" >> .env.production
           echo "NEXT_DISABLE_TYPE_CHECKS=1" >> .env.production
