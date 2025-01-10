@@ -22,6 +22,30 @@ export function useSupabaseClient() {
           return;
         }
 
+        // After getting the token, sync the user data
+        try {
+          console.log('=== Syncing user data with Supabase ===');
+          const response = await fetch('/api/users/sync', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          
+          if (!response.ok) {
+            const errorText = await response.text();
+            console.error('Failed to sync user:', errorText);
+            // Don't return - continue with client initialization
+          } else {
+            const userData = await response.json();
+            console.log('User synced successfully:', userData);
+          }
+        } catch (error) {
+          console.error('Error syncing user:', error);
+          // Continue with client initialization even if sync fails
+        }
+
         // Decode and log JWT payload for debugging
         try {
           const [header, payload] = token.split('.');

@@ -71,21 +71,21 @@ These user stories will guide the design of workflows and permissions for both r
 
 ---
 
-### **Authorization Requirements with Clerk**
+### **Authorization Requirements with Supabase Auth**
 
 #### **For General Users**
 
-1. Users must be authenticated via Clerk before accessing any system functionality.
-2. Users can only send messages in channels they belong to, verified via the `ChannelMembers` table.
-3. Users can only view private channels they are members of, enforced by a check on the `ChannelMembers` table.
+1. Users must be authenticated via Supabase Auth before accessing any system functionality.
+2. Users can only send messages in channels they belong to, verified via Row Level Security (RLS) policies.
+3. Users can only view private channels they are members of, enforced by RLS policies on the channels table.
 
 #### **For Admins**
 
-1. Admins must have their `role` field in the `User` table set to `admin` by Clerk to perform admin functions.
-2. Admin actions such as creating channels or managing permissions should be verified through a combination of Clerk authentication and `role` checks in the database.
+1. Admins must have their `role` field in the `User` table set to `admin` to perform admin functions.
+2. Admin actions such as creating channels or managing permissions should be verified through RLS policies.
 3. Admins should manage channel-specific permissions by updating the `role_in_channel` field in the `ChannelMembers` table.
 
-This design ensures clear data relationships, role-based access control, and efficient implementation with Next.js, Postgres, and Clerk.
+This design ensures clear data relationships, role-based access control, and efficient implementation with Next.js, Postgres, and Supabase.
 
 ### **1. API Routes with HTTP Methods and Auth Requirements**
 

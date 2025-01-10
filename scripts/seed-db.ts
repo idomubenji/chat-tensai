@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 import type { Database } from '@/types/supabase';
 
-// Load environment variables from both .env files
+// Load environment variables
 dotenv.config({ path: '.env.local' });
 
 // Safety check: Only allow this script to run in development
@@ -15,8 +15,6 @@ if (isProduction) {
   process.exit(1);
 }
 
-console.log('✓ Running in development environment');
-
 // Use local Supabase URL and service role key
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -27,8 +25,6 @@ if (!supabaseUrl || !serviceRoleKey) {
   if (!serviceRoleKey) console.error('- SUPABASE_SERVICE_ROLE_KEY');
   process.exit(1);
 }
-
-console.log('Using Supabase URL:', supabaseUrl);
 
 const supabase = createClient<Database>(
   supabaseUrl,
@@ -44,7 +40,7 @@ const supabase = createClient<Database>(
 // Add a prefix to ensure these IDs don't conflict with real users
 const DEV_PREFIX = 'dev_';
 
-const systemUsers = [
+const animeUsers = [
   {
     id: `${DEV_PREFIX}bot`,
     name: 'Chat Genius Bot (Dev)',
@@ -54,51 +50,76 @@ const systemUsers = [
     role: 'USER' as const
   },
   {
-    id: `${DEV_PREFIX}alice`,
-    name: 'Alice (Dev)',
-    email: 'alice@chat-genius.local',
+    id: `${DEV_PREFIX}kawaii_neko`,
+    name: 'Kawaii Neko-chan',
+    email: 'neko@chat-genius.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const
   },
   {
-    id: `${DEV_PREFIX}bob`,
-    name: 'Bob (Dev)',
-    email: 'bob@chat-genius.local',
+    id: `${DEV_PREFIX}otaku_sensei`,
+    name: 'Otaku Sensei',
+    email: 'sensei@chat-genius.local',
+    avatar_url: null,
+    status: 'ONLINE' as const,
+    role: 'USER' as const
+  },
+  {
+    id: `${DEV_PREFIX}moe_master`,
+    name: 'Moe Master',
+    email: 'moe@chat-genius.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const
   }
 ];
 
-const initialMessages = [
-  {
-    userId: `${DEV_PREFIX}alice`,
-    content: "Hi everyone! Excited to be here! 👋"
-  },
-  {
-    userId: `${DEV_PREFIX}bob`,
-    content: "Hey Alice! Great to see you here! How's everyone doing? 😊"
-  },
+const animeMessages = [
   {
     userId: `${DEV_PREFIX}bot`,
-    content: "Welcome Alice and Bob! Feel free to explore the channels and features. Let me know if you need any help! 🤖"
+    content: "Welcome to Chat Genius! 👋 [Development Environment]"
+  },
+  {
+    userId: `${DEV_PREFIX}kawaii_neko`,
+    content: "Hey everyone! Who else thinks anime girls are just the cutest? (＾▽＾)♡"
+  },
+  {
+    userId: `${DEV_PREFIX}otaku_sensei`,
+    content: "Absolutely! The way they say 'Kyaaaa~' when they're embarrassed is just too precious! 🌸"
+  },
+  {
+    userId: `${DEV_PREFIX}moe_master`,
+    content: "Don't forget about their adorable cat ears and tails! Nekomimi supremacy! 😻"
+  },
+  {
+    userId: `${DEV_PREFIX}kawaii_neko`,
+    content: "Yessss! And when they do that thing where they put their hands on their cheeks and blush... my heart can't take it! (｡♡‿♡｡)"
+  },
+  {
+    userId: `${DEV_PREFIX}otaku_sensei`,
+    content: "The best is when they're trying to act tough but they're actually super shy inside... gap moe is life! 💕"
+  },
+  {
+    userId: `${DEV_PREFIX}moe_master`,
+    content: "Speaking of cute anime girls, have you seen the new season of 'My Totally Adorable Little Sister Can't Be This Kawaii'? The animation is so fluffy! ✨"
   }
 ];
 
 async function main() {
   try {
-    console.log('Creating development system users...');
-    
-    // Create system users
-    for (const user of systemUsers) {
+    console.log('=== Starting database seeding ===\n');
+
+    // Create users
+    console.log('Creating development users...');
+    for (const user of animeUsers) {
       const { data: existingUser, error: checkError } = await supabase
         .from('users')
         .select()
         .eq('id', user.id)
         .single();
 
-      if (checkError && checkError.code !== 'PGRST116') { // PGRST116 means no rows returned
+      if (checkError && checkError.code !== 'PGRST116') {
         throw checkError;
       }
 
@@ -116,26 +137,25 @@ async function main() {
       }
     }
 
-    // Check for #general channel
-    console.log('\nChecking for #general channel...');
-    const { data: channel, error: channelError } = await supabase
+    // Create general channel
+    console.log('\nCreating #general channel...');
+    const { data: existingChannel, error: channelCheckError } = await supabase
       .from('channels')
       .select('*')
-      .eq('name', '#general')
+      .or('name.eq.general,name.eq.#general')
       .single();
 
-    if (channelError && channelError.code !== 'PGRST116') {
-      throw channelError;
+    if (channelCheckError && channelCheckError.code !== 'PGRST116') {
+      throw channelCheckError;
     }
 
-    let generalChannel = channel;
+    let generalChannel = existingChannel;
     if (!generalChannel) {
       const { data: newChannel, error: createError } = await supabase
         .from('channels')
         .insert({
           name: '#general',
-          description: 'General discussion channel (Dev)',
-          is_private: false,
+          description: 'General discussion channel',
           created_by_id: `${DEV_PREFIX}bot`
         })
         .select()
@@ -145,12 +165,22 @@ async function main() {
       generalChannel = newChannel;
       console.log('Created #general channel with ID:', generalChannel.id);
     } else {
+      // Update the name if needed
+      if (generalChannel.name !== '#general') {
+        const { error: updateError } = await supabase
+          .from('channels')
+          .update({ name: '#general' })
+          .eq('id', generalChannel.id);
+        
+        if (updateError) throw updateError;
+        console.log('Updated channel name to #general');
+      }
       console.log('#general channel already exists with ID:', generalChannel.id);
     }
 
-    // Add all system users to #general
+    // Add all users to general channel
     console.log('\nAdding users to #general...');
-    for (const user of systemUsers) {
+    for (const user of animeUsers) {
       const { data: membership, error: membershipError } = await supabase
         .from('channel_members')
         .select()
@@ -168,7 +198,7 @@ async function main() {
           .insert({
             channel_id: generalChannel.id,
             user_id: user.id,
-            role: 'MEMBER'
+            role_in_channel: user.id === `${DEV_PREFIX}bot` ? 'ADMIN' : 'MEMBER'
           });
 
         if (joinError) throw joinError;
@@ -178,45 +208,9 @@ async function main() {
       }
     }
 
-    // Check for welcome message
-    console.log('\nChecking for welcome message...');
-    const { data: welcomeMessage, error: messageError } = await supabase
-      .from('messages')
-      .select()
-      .eq('channel_id', generalChannel.id)
-      .eq('user_id', `${DEV_PREFIX}bot`)
-      .eq('content', 'Welcome to Chat Genius! 👋 [Development Environment]')
-      .single();
-
-    if (messageError && messageError.code !== 'PGRST116') {
-      throw messageError;
-    }
-
-    if (!welcomeMessage) {
-      const { data: newMessage, error: createError } = await supabase
-        .from('messages')
-        .insert({
-          channel_id: generalChannel.id,
-          user_id: `${DEV_PREFIX}bot`,
-          content: 'Welcome to Chat Genius! 👋 [Development Environment]'
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('Error creating welcome message:', createError);
-        throw createError;
-      }
-      console.log('Created welcome message with ID:', newMessage.id);
-    } else {
-      console.log('Welcome message already exists with ID:', welcomeMessage.id);
-    }
-
-    // Add initial messages
-    console.log('\nAdding initial messages...');
-    for (const message of initialMessages) {
-      console.log(`\nProcessing message from ${message.userId}:`, message.content);
-      
+    // Add messages
+    console.log('\nAdding messages to #general...');
+    for (const message of animeMessages) {
       const { data: existingMessage, error: checkError } = await supabase
         .from('messages')
         .select()
@@ -245,36 +239,58 @@ async function main() {
           console.error('Error creating message:', createError);
           throw createError;
         }
-        console.log(`Added message from ${message.userId} with ID:`, newMessage.id);
+        console.log(`Added message from ${message.userId}: ${message.content.slice(0, 30)}...`);
       } else {
-        console.log(`Message from ${message.userId} already exists with ID:`, existingMessage.id);
+        console.log(`Message already exists from ${message.userId}: ${message.content.slice(0, 30)}...`);
       }
     }
 
-    // Verify all messages
-    console.log('\nVerifying all messages in #general...');
-    const { data: allMessages, error: listError } = await supabase
+    // Verify final state
+    console.log('\n=== Verifying database state ===');
+    
+    // Check users
+    const { data: finalUsers, error: usersError } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: true });
+    
+    if (usersError) throw usersError;
+    console.log(`\nFound ${finalUsers.length} users:`);
+    finalUsers.forEach(user => {
+      console.log(`- ${user.name} (${user.id})`);
+    });
+
+    // Check channels
+    const { data: finalChannels, error: channelsError } = await supabase
+      .from('channels')
+      .select('*')
+      .order('created_at', { ascending: true });
+    
+    if (channelsError) throw channelsError;
+    console.log(`\nFound ${finalChannels.length} channels:`);
+    finalChannels.forEach(channel => {
+      console.log(`- ${channel.name} (${channel.id})`);
+    });
+
+    // Check messages
+    const { data: finalMessages, error: messagesError } = await supabase
       .from('messages')
       .select(`
         *,
-        user:users!messages_user_id_fkey(name)
+        user:users!inner(name),
+        channel:channels!inner(name)
       `)
-      .eq('channel_id', generalChannel.id)
       .order('created_at', { ascending: true });
-
-    if (listError) {
-      console.error('Error listing messages:', listError);
-      throw listError;
-    }
-
-    console.log('\nAll messages in #general:');
-    allMessages.forEach(msg => {
-      console.log(`- [${msg.user.name}]: ${msg.content}`);
+    
+    if (messagesError) throw messagesError;
+    console.log(`\nFound ${finalMessages.length} messages:`);
+    finalMessages.forEach(msg => {
+      console.log(`- [${msg.channel.name}] ${msg.user.name}: ${msg.content.slice(0, 50)}...`);
     });
 
-    console.log('\nDevelopment system setup completed successfully!');
+    console.log('\n=== Database seeding completed successfully! ===');
   } catch (error) {
-    console.error('Error:', error);
+    console.error('\nError:', error);
     process.exit(1);
   }
 }
