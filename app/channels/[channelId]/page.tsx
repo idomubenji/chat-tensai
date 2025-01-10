@@ -2,253 +2,69 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { ChatWindow } from "@/components/ChatWindow";
-import { useAuth } from "@clerk/nextjs";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { ThreadWindow } from "@/components/ThreadWindow";
-import { useChannels } from "@/hooks/useChannels";
-import type { Database } from '@/types/supabase';
+import { LoadingBall } from "@/components/ui/loading";
+import { TopBar } from "@/components/TopBar";
 import { Sidebar } from "@/components/Sidebar";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
-type Message = {
-  id: string;
-  content: string;
-  userId: string;
-  userName: string;
-  createdAt: string;
-  reactions: {
-    [key: string]: {
-      emoji: string;
-      userIds: string[];
-    };
-  };
-  replies?: Message[]; // Add this for thread support
-  parentId?: string; // For identifying thread relationships
-};
-
-export default function ChannelPage({
-  params,
-}: {
-  params: { channelId: string };
-}) {
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [loading, setLoading] = useState(true);
-  const { channels, loading: channelsLoading } = useChannels();
-  const channel = channels.find((c) => c.id === params.channelId);
-  const { isLoaded, userId } = useAuth();
+export default function ChannelPage({ params }: { params: { channelId: string } }) {
+  const { isLoaded, userId } = useSupabaseAuth();
   const router = useRouter();
-  const [selectedMessage, setSelectedMessage] = useState<Message | null>(null);
+  const [selectedMessageId, setSelectedMessageId] = useState<string | null>(null);
 
-  const fetchMessagesForChannel = useCallback(async (channelId: string) => {
-    if (!userId) return;
-    try {
-      const response = await fetch(
-        `/api/channels/${channelId}/messages`,
-        {
-          method: 'GET',
-          headers: {
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-      if (!response.ok) throw new Error("Failed to fetch messages");
-      const data = await response.json();
-      
-      // Transform the messages to include user data
-      const transformedMessages = data.map((msg: any) => ({
-        id: msg.id,
-        content: msg.content,
-        userId: msg.user_id,
-        userName: msg.user?.name || 'Unknown User',
-        createdAt: msg.created_at,
-        reactions: msg.reactions?.reduce((acc: any, reaction: any) => {
-          if (!acc[reaction.emoji]) {
-            acc[reaction.emoji] = {
-              emoji: reaction.emoji,
-              userIds: []
-            };
-          }
-          acc[reaction.emoji].userIds.push(reaction.user_id);
-          return acc;
-        }, {}),
-        parentId: msg.parent_id
-      }));
-
-      setMessages(transformedMessages);
-    } catch (error) {
-      console.error("Error fetching messages:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
-
-  // Handle authentication
   useEffect(() => {
     if (isLoaded && !userId) {
       router.push('/sign-in');
     }
   }, [isLoaded, userId, router]);
 
-  // Handle channel redirection and message fetching
-  useEffect(() => {
-    const handleChannelSetup = async () => {
-      if (!channelsLoading && userId && channels.length > 0) {
-        console.log('=== Channel Setup Start ===');
-        console.log('Current channel ID:', params.channelId);
-        console.log('Available channels:', channels);
-        
-        const currentChannel = channels.find(c => c.id === params.channelId);
-        const generalChannel = channels.find(c => c.name === 'general');
-        
-        console.log('Current channel:', currentChannel);
-        console.log('General channel:', generalChannel);
+  const handleMessageSelect = useCallback((messageId: string) => {
+    setSelectedMessageId(messageId);
+  }, []);
 
-        if (!currentChannel && generalChannel) {
-          console.log('Channel not found, redirecting to general channel:', generalChannel.id);
-          await router.replace(`/channels/${generalChannel.id}`, { scroll: false });
-        } else if (currentChannel) {
-          console.log('Fetching messages for current channel');
-          await fetchMessagesForChannel(currentChannel.id);
-        }
-        
-        console.log('=== Channel Setup End ===');
-      }
-    };
+  const handleCloseThread = useCallback(() => {
+    setSelectedMessageId(null);
+  }, []);
 
-    handleChannelSetup();
-  }, [channelsLoading, userId, channels, params.channelId, router, fetchMessagesForChannel]);
+  // Show loading state while checking auth
+  if (!isLoaded) {
+    return <LoadingBall />;
+  }
 
-  const handleMessageSent = async (content: string) => {
-    if (!userId) return; // Don't send if not authenticated
-    try {
-      const response = await fetch(
-        `/api/channels/${params.channelId}/messages`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ content }),
-        }
-      );
-
-      if (!response.ok) throw new Error("Failed to send message");
-
-      // Transform the new message to match the expected format
-      const newMessageData = await response.json();
-      const transformedMessage = {
-        id: newMessageData.id,
-        content: newMessageData.content,
-        userId: newMessageData.user_id,
-        userName: newMessageData.user?.name || 'Unknown User',
-        createdAt: newMessageData.created_at,
-        reactions: {},
-        parentId: newMessageData.parent_id
-      };
-
-      // Add the new message to the state immediately
-      setMessages(prev => [...prev, transformedMessage]);
-    } catch (error) {
-      console.error("Error sending message:", error);
-    }
-  };
-
-  const handleReactionUpdate = (messageId: string, updatedReactions: Message['reactions']) => {
-    setMessages(prevMessages => 
-      prevMessages.map(message => 
-        message.id === messageId 
-          ? { ...message, reactions: updatedReactions }
-          : message
-      )
-    );
-  };
-
-  const handleMessageUpdate = (messageId: string, updates: Partial<Message>) => {
-    setMessages(prevMessages => 
-      prevMessages.map(message => 
-        message.id === messageId 
-          ? { ...message, ...updates }
-          : message
-      )
-    );
-
-    // If this is the selected message, update it in the state
-    if (selectedMessage?.id === messageId) {
-      setSelectedMessage(prev => prev ? { ...prev, ...updates } : null);
-    }
-  };
-
-  // Return null while redirecting to sign-in
+  // Only show the main content if user is authenticated
   if (!userId) {
-    return null;
+    return null; // Return null while redirecting
   }
-
-  // Show loading state while fetching channels
-  if (channelsLoading) {
-    return <div className="flex h-screen items-center justify-center">Loading channels...</div>;
-  }
-
-  // Return loading state while redirecting
-  if (!channel) {
-    return <div className="flex h-screen items-center justify-center">Redirecting...</div>;
-  }
-
-  const handleReply = async (content: string) => {
-    if (!selectedMessage) return;
-    const newReply = {
-      id: Math.random().toString(),
-      content,
-      userId,
-      userName: messages.find(m => m.userId === userId)?.userName || 'Unknown User',
-      createdAt: new Date().toISOString(),
-      reactions: {}
-    };
-    handleMessageUpdate(selectedMessage.id, {
-      replies: [...(selectedMessage.replies || []), newReply]
-    });
-  };
 
   return (
     <div className="flex h-full">
       <Sidebar />
-      <div className={cn(
-        "flex flex-col h-full flex-1",
-        selectedMessage ? "w-[calc(100%-400px)]" : "w-full"
-      )}>
-        <div className="p-4 border-b bg-[#445566] text-white">
-          <h1 className="text-2xl font-bold">
-            {channel.name.startsWith('#') ? channel.name : `#${channel.name}`}
-          </h1>
-          {channel.description && (
-            <p className="text-sm text-gray-300">{channel.description}</p>
+      <div className="flex-1 flex flex-col">
+        <TopBar />
+        <div className="flex-1 flex overflow-hidden bg-[#F5E6D3]">
+          <div className={cn(
+            "flex-1 flex flex-col",
+            selectedMessageId && "lg:border-r border-gray-200"
+          )}>
+            <ChatWindow
+              channelId={params.channelId}
+              onMessageSelect={handleMessageSelect}
+              selectedMessageId={selectedMessageId}
+            />
+          </div>
+          {selectedMessageId && (
+            <div className="hidden lg:flex lg:w-96 xl:w-[480px]">
+              <ThreadWindow
+                messageId={selectedMessageId}
+                onClose={handleCloseThread}
+              />
+            </div>
           )}
         </div>
-        <div className="flex-1 min-h-0">
-          <ChatWindow
-            channelId={params.channelId}
-            messages={messages}
-            onSendMessage={handleMessageSent}
-            onReactionUpdate={handleReactionUpdate}
-            onMessageUpdate={handleMessageUpdate}
-            selectedMessage={selectedMessage}
-            onSelectMessage={setSelectedMessage}
-            isLoading={!isLoaded || loading}
-          />
-        </div>
       </div>
-
-      {selectedMessage && (
-        <div className="w-[400px] border-l border-gray-300">
-          <ThreadWindow
-            parentMessage={messages.find(m => m.id === selectedMessage.id) || selectedMessage}
-            replies={selectedMessage.replies || []}
-            currentUserId={userId}
-            onSendReply={handleReply}
-            onReactionUpdate={handleReactionUpdate}
-            onClose={() => setSelectedMessage(null)}
-          />
-        </div>
-      )}
     </div>
   );
 }

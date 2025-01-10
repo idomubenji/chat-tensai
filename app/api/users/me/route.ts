@@ -1,12 +1,12 @@
-import { auth } from '@clerk/nextjs';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { getAuthUserId } from '@/lib/auth';
 
 export async function GET() {
   try {
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -38,7 +38,7 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -96,7 +96,7 @@ export async function PATCH(req: Request) {
 
 export async function DELETE() {
   try {
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
@@ -127,6 +127,9 @@ export async function DELETE() {
       .eq('id', userId);
 
     if (userError) throw userError;
+
+    // Sign out the user
+    await supabase.auth.signOut();
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

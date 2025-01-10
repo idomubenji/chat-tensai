@@ -1,104 +1,110 @@
-import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChatWindow } from '@/components/ChatWindow';
-import '@testing-library/jest-dom';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
-// Mock scrollIntoView
-window.HTMLElement.prototype.scrollIntoView = jest.fn();
-
-// Mock Clerk auth
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    userId: 'user1',
-    isLoaded: true,
-    isSignedIn: true
-  })
-}));
-
-const mockMessages = [
-  {
-    id: '1',
-    content: 'Hello',
-    userId: 'user1',
-    userName: 'User One',
-    createdAt: '2023-01-01T09:23:09.000Z',
-    updatedAt: '2023-01-01T09:23:09.000Z',
-    reactions: {},
-    replies: []
-  }
-];
-
-const mockOnSendMessage = jest.fn().mockImplementation(() => Promise.resolve());
-const mockOnReactionUpdate = jest.fn();
-const mockOnMessageUpdate = jest.fn();
-const mockOnSelectMessage = jest.fn();
+// Mock useSupabaseAuth hook
+jest.mock('@/hooks/useSupabaseAuth');
 
 describe('ChatWindow', () => {
+  const mockMessages = [
+    {
+      id: '1',
+      content: 'Test message 1',
+      created_at: new Date().toISOString(),
+      user_id: 'test-user-id',
+      channel_id: 'test-channel',
+      user: {
+        id: 'test-user-id',
+        name: 'Test User',
+        email: 'test@example.com'
+      }
+    }
+  ];
+
   beforeEach(() => {
+    (useSupabaseAuth as jest.Mock).mockReturnValue({
+      userId: 'test-user-id',
+      isLoaded: true,
+      isSignedIn: true
+    });
+
+    // Mock fetch for message sending
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ message: 'Message sent' })
+      })
+    ) as jest.Mock;
+  });
+
+  afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders messages correctly', async () => {
+  it('renders messages correctly', () => {
     render(
       <ChatWindow
-        messages={mockMessages}
-        onSendMessage={mockOnSendMessage}
-        onReactionUpdate={mockOnReactionUpdate}
-        onMessageUpdate={mockOnMessageUpdate}
-        selectedMessage={null}
-        onSelectMessage={mockOnSelectMessage}
         channelId="test-channel"
+        onMessageSelect={jest.fn()}
+        selectedMessageId={null}
       />
     );
 
-    await waitFor(() => {
-      expect(screen.getByText('Hello')).toBeInTheDocument();
-      expect(screen.getByText('4:23:09 AM')).toBeInTheDocument();
-    });
+    expect(screen.getByText('Test message 1')).toBeInTheDocument();
   });
 
   it('allows sending new messages', async () => {
     render(
       <ChatWindow
-        messages={mockMessages}
-        onSendMessage={mockOnSendMessage}
-        onReactionUpdate={mockOnReactionUpdate}
-        onMessageUpdate={mockOnMessageUpdate}
-        selectedMessage={null}
-        onSelectMessage={mockOnSelectMessage}
         channelId="test-channel"
+        onMessageSelect={jest.fn()}
+        selectedMessageId={null}
       />
     );
 
-    await waitFor(() => {
-      const input = screen.getByPlaceholderText('Type a message...');
-      fireEvent.change(input, { target: { value: 'New message' } });
-      const form = input.closest('form');
-      fireEvent.submit(form!);
-    });
+    const input = screen.getByPlaceholderText(/type a message/i);
+    const sendButton = screen.getByRole('button', { name: /send/i });
 
-    expect(mockOnSendMessage).toHaveBeenCalledWith('New message');
+    fireEvent.change(input, { target: { value: 'New test message' } });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/channels/test-channel/messages',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ content: 'New test message' })
+        })
+      );
+    });
   });
 
-  it('shows emoji reaction options on hover', async () => {
+  it('handles message selection', () => {
+    const mockOnMessageSelect = jest.fn();
     render(
       <ChatWindow
-        messages={mockMessages}
-        onSendMessage={mockOnSendMessage}
-        onReactionUpdate={mockOnReactionUpdate}
-        onMessageUpdate={mockOnMessageUpdate}
-        selectedMessage={null}
-        onSelectMessage={mockOnSelectMessage}
         channelId="test-channel"
+        onMessageSelect={mockOnMessageSelect}
+        selectedMessageId={null}
       />
     );
 
-    await waitFor(() => {
-      const message = screen.getByText('Hello');
-      fireEvent.mouseEnter(message.parentElement!);
-    });
+    const message = screen.getByText('Test message 1');
+    fireEvent.click(message);
 
-    const reactionButtons = screen.getAllByTitle('Add reaction');
-    expect(reactionButtons[0]).toBeInTheDocument();
+    expect(mockOnMessageSelect).toHaveBeenCalledWith('1');
+  });
+
+  it('highlights selected message', () => {
+    render(
+      <ChatWindow
+        channelId="test-channel"
+        onMessageSelect={jest.fn()}
+        selectedMessageId="1"
+      />
+    );
+
+    const message = screen.getByText('Test message 1').closest('.message');
+    expect(message).toHaveClass('selected');
   });
 }); 

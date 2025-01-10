@@ -48,8 +48,8 @@ CREATE TABLE IF NOT EXISTS public.users (
   email text UNIQUE NOT NULL,
   name text,
   avatar_url text,
-  status text DEFAULT 'ONLINE'::text,
-  role text DEFAULT 'USER'::text,
+  status user_status DEFAULT 'ONLINE'::user_status,
+  role user_role DEFAULT 'USER'::user_role,
   created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
 );
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.channel_members (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   channel_id uuid REFERENCES public.channels(id) ON DELETE CASCADE,
   user_id text REFERENCES public.users(id) ON DELETE CASCADE,
-  role_in_channel text DEFAULT 'MEMBER'::text,
+  role_in_channel channel_role DEFAULT 'MEMBER'::channel_role,
   joined_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
   UNIQUE(channel_id, user_id)
 );

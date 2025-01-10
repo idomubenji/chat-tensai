@@ -1,6 +1,6 @@
 'use client';
 
-import { useClerk } from '@clerk/nextjs';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { useRouter } from 'next/navigation';
 import { LogOut } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/tooltip';
 
 export function SignOutButton() {
-  const { signOut } = useClerk();
+  const { signOut } = useSupabaseAuth();
   const router = useRouter();
 
   const handleSignOut = async () => {

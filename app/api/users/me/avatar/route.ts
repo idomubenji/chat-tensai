@@ -1,4 +1,3 @@
-import { auth } from '@clerk/nextjs';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
@@ -6,6 +5,7 @@ import { NextResponse } from 'next/server';
 import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Database } from '@/types/supabase';
+import { getAuthUserId } from '@/lib/auth';
 
 // Initialize S3 client
 const s3 = new S3Client({
@@ -33,21 +33,21 @@ const supabaseAdmin = createClient<Database>(
 
 const BUCKET_NAME = process.env.S3_BUCKET_NAME;
 const AVATAR_PREFIX = 'avatars/';
-const URL_EXPIRATION = 604800; // 7 days in seconds
+const URL_EXPIRATION = 604800;
 
 export async function POST(req: Request) {
   try {
     // 1. Auth check
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     console.log('\n=== AVATAR UPLOAD: START ===');
     console.log('Attempting operation with:', {
-      clerkUserId: userId,
-      clerkUserIdType: typeof userId,
-      clerkUserIdLength: userId.length
+      userId,
+      userIdType: typeof userId,
+      userIdLength: userId.length
     });
 
     // Let's check what users exist in Supabase
@@ -148,6 +148,27 @@ export async function POST(req: Request) {
 
       await s3.send(putCommand);
       console.log('Successfully uploaded file to S3:', fileName);
+
+      // Generate a signed URL for the uploaded file
+      const getCommand = new GetObjectCommand({
+        Bucket: BUCKET_NAME,
+        Key: fileName,
+      });
+
+      const signedUrl = await getSignedUrl(s3, getCommand, { expiresIn: URL_EXPIRATION });
+
+      // Update user's avatar URL in Supabase
+      const { error: updateError } = await supabaseAdmin
+        .from('users')
+        .update({ avatar_url: signedUrl })
+        .eq('id', userId);
+
+      if (updateError) {
+        console.error('Failed to update avatar URL:', updateError);
+        return new NextResponse('Failed to update avatar URL', { status: 500 });
+      }
+
+      return NextResponse.json({ url: signedUrl });
     } catch (error: any) {
       const s3Error = error as Error;
       console.error('S3 upload error details:', {
@@ -159,87 +180,9 @@ export async function POST(req: Request) {
       });
       return new NextResponse(`Failed to upload file to S3: ${s3Error.message}`, { status: 500 });
     }
-
-    // 5. Generate pre-signed URL
-    let signedUrl: string;
-    try {
-      const getCommand = new GetObjectCommand({
-        Bucket: BUCKET_NAME,
-        Key: fileName,
-      });
-      signedUrl = await getSignedUrl(s3, getCommand, { expiresIn: URL_EXPIRATION });
-      console.log('Generated signed URL:', signedUrl);
-    } catch (urlError) {
-      console.error('Failed to generate signed URL:', urlError);
-      return new NextResponse('Failed to generate file URL', { status: 500 });
-    }
-
-    // 6. Update database
-    try {
-      console.log('Attempting to update user profile:', {
-        userId,
-        avatarUrl: signedUrl
-      });
-
-      // First, check if the user exists
-      const { data: existingUser, error: userError } = await supabaseAdmin
-        .from('users')
-        .select('id')
-        .eq('id', userId)
-        .single();
-
-      if (userError) {
-        console.error('Error checking user existence:', {
-          error: userError,
-          userId
-        });
-        return new NextResponse('User not found', { status: 404 });
-      }
-
-      // Then update the user
-      const { data, error: updateError } = await supabaseAdmin
-        .from('users')
-        .update({
-          avatar_url: signedUrl,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .select()
-        .single();
-
-      if (updateError) {
-        console.error('Database update error details:', {
-          error: updateError,
-          code: updateError.code,
-          message: updateError.message,
-          details: updateError.details,
-          hint: updateError.hint,
-          userId,
-          signedUrl
-        });
-        return new NextResponse(`Database update failed: ${updateError.message}`, { status: 500 });
-      }
-
-      console.log('Successfully updated user profile:', data);
-      return NextResponse.json({ avatar_url: signedUrl });
-    } catch (dbError) {
-      console.error('Database error details:', {
-        error: dbError,
-        message: dbError instanceof Error ? dbError.message : 'Unknown error',
-        userId,
-        avatarUrl: signedUrl
-      });
-      return new NextResponse(
-        `Failed to update user profile: ${dbError instanceof Error ? dbError.message : 'Unknown error'}`, 
-        { status: 500 }
-      );
-    }
   } catch (error) {
     console.error('Error in avatar upload:', error);
-    return new NextResponse(
-      error instanceof Error ? error.message : 'Internal Server Error', 
-      { status: 500 }
-    );
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 

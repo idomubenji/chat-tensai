@@ -1,11 +1,11 @@
 import { createSupabaseAdminClient } from '@/lib/supabase';
-import { auth } from '@clerk/nextjs';
+import { getAuthUserId } from '@/lib/auth';
 import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
     // Check if user is authenticated
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }

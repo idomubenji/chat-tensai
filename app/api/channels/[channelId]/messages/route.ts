@@ -1,14 +1,14 @@
-import { auth } from '@clerk/nextjs';
 import { createSupabaseAdminClient } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { getAuthUserId, checkChannelExists, checkChannelMembership } from '@/lib/auth';
 
 export async function GET(
   req: Request,
   { params }: { params: { channelId: string } }
 ) {
   try {
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
@@ -16,34 +16,15 @@ export async function GET(
     const supabase = createSupabaseAdminClient();
 
     // First check if the channel exists
-    const { data: channel, error: channelError } = await supabase
-      .from('channels')
-      .select()
-      .eq('id', params.channelId)
-      .single();
-
-    if (channelError) {
-      console.error('Channel check error:', channelError);
-      if (channelError.code === 'PGRST116') {
-        return new NextResponse('Channel not found', { status: 404 });
-      }
-      return new NextResponse('Internal Server Error', { status: 500 });
+    const channel = await checkChannelExists(params.channelId);
+    if (!channel) {
+      return new NextResponse('Channel not found', { status: 404 });
     }
 
     // Then check if user is a member of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
-      .select()
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
-      .single();
-
-    if (membershipError) {
-      console.error('Membership check error:', membershipError);
-      if (membershipError.code === 'PGRST116') {
-        return new NextResponse('Not a member of this channel', { status: 403 });
-      }
-      return new NextResponse('Internal Server Error', { status: 500 });
+    const membership = await checkChannelMembership(params.channelId, userId);
+    if (!membership) {
+      return new NextResponse('Not a member of this channel', { status: 403 });
     }
 
     // Get URL parameters
@@ -87,7 +68,7 @@ export async function POST(
   { params }: { params: { channelId: string } }
 ) {
   try {
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
@@ -95,34 +76,15 @@ export async function POST(
     const supabase = createSupabaseAdminClient();
 
     // First check if the channel exists
-    const { data: channel, error: channelError } = await supabase
-      .from('channels')
-      .select()
-      .eq('id', params.channelId)
-      .single();
-
-    if (channelError) {
-      console.error('Channel check error:', channelError);
-      if (channelError.code === 'PGRST116') {
-        return new NextResponse('Channel not found', { status: 404 });
-      }
-      return new NextResponse('Internal Server Error', { status: 500 });
+    const channel = await checkChannelExists(params.channelId);
+    if (!channel) {
+      return new NextResponse('Channel not found', { status: 404 });
     }
 
     // Then check if user is a member of the channel
-    const { data: membership, error: membershipError } = await supabase
-      .from('channel_members')
-      .select()
-      .eq('channel_id', params.channelId)
-      .eq('user_id', userId)
-      .single();
-
-    if (membershipError) {
-      console.error('Membership check error:', membershipError);
-      if (membershipError.code === 'PGRST116') {
-        return new NextResponse('Not a member of this channel', { status: 403 });
-      }
-      return new NextResponse('Internal Server Error', { status: 500 });
+    const membership = await checkChannelMembership(params.channelId, userId);
+    if (!membership) {
+      return new NextResponse('Not a member of this channel', { status: 403 });
     }
 
     const body = await req.json();

@@ -1,63 +1,29 @@
-import { clerkClient } from '@clerk/nextjs';
-import { auth } from '@clerk/nextjs';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
+import { getAuthUserId } from '@/lib/auth';
 
 export async function POST() {
   try {
-    console.log('=== Starting user sync ===');
-    
-    // Get the current user from Clerk
-    const { userId } = auth();
+    const userId = await getAuthUserId();
     if (!userId) {
-      console.error('No user ID from Clerk auth');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
-    console.log('Processing user:', userId);
 
-    // Get user data from Clerk
-    const user = await clerkClient.users.getUser(userId);
-    if (!user) {
-      console.error('User not found in Clerk');
-      return NextResponse.json({ error: 'User not found in Clerk' }, { status: 404 });
-    }
-    
-    // Get username and email from Clerk
-    const username = user.username || user.emailAddresses[0]?.emailAddress?.split('@')[0];
-    const email = user.emailAddresses[0]?.emailAddress;
-    
-    if (!username || !email) {
-      console.error('Missing required user data:', { username, email });
-      return NextResponse.json({ error: 'Missing required user data' }, { status: 400 });
-    }
-    
-    console.log('User data from Clerk:', { userId, username, email });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
 
-    // Initialize Supabase client
-    const supabase = createRouteHandlerClient({ cookies });
-
-    // Upsert user in Supabase
-    const { data: userData, error: upsertError } = await supabase
+    // Get user data from Supabase
+    const { data: user, error: userError } = await supabase
       .from('users')
-      .upsert({
-        id: userId,
-        name: username,
-        email: email,
-        avatar_url: null,
-        role: 'USER',
-        status: 'ONLINE',
-        updated_at: new Date().toISOString()
-      })
-      .select()
+      .select('*')
+      .eq('id', userId)
       .single();
 
-    if (upsertError) {
-      console.error('Error upserting user:', upsertError);
-      return NextResponse.json({ error: 'Failed to sync user' }, { status: 500 });
+    if (userError) {
+      console.error('Error fetching user:', userError);
+      return NextResponse.json({ error: 'User not found' }, { status: 404 });
     }
-    
-    console.log('User synced successfully:', userData);
 
     // Get all channels
     const { data: channels, error: channelsError } = await supabase
@@ -78,7 +44,9 @@ export async function POST() {
         .upsert({
           channel_id: channel.id,
           user_id: userId,
-          role: 'USER'
+          role_in_channel: 'MEMBER'
+        }, {
+          onConflict: 'user_id,channel_id'
         });
 
       if (memberError) {
@@ -88,7 +56,7 @@ export async function POST() {
       }
     }
 
-    return NextResponse.json(userData);
+    return NextResponse.json(user);
   } catch (error) {
     console.error('Error in sync endpoint:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

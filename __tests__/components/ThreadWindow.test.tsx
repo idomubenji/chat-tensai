@@ -1,124 +1,108 @@
-import React from 'react';
-import { render, screen, fireEvent, act } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ThreadWindow } from '@/components/ThreadWindow';
-import '@testing-library/jest-dom';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
-// Mock Clerk auth
-jest.mock('@clerk/nextjs', () => ({
-  useAuth: () => ({
-    userId: 'user1',
-    isLoaded: true,
-    isSignedIn: true
-  })
-}));
-
-const mockParentMessage = {
-  id: '1',
-  content: 'Parent message',
-  userId: 'user1',
-  userName: 'User One',
-  createdAt: new Date().toISOString(),
-  reactions: {
-    '👍': {
-      emoji: '👍',
-      userIds: ['user1']
-    }
-  }
-};
-
-const mockReplies = [
-  {
-    id: '2',
-    content: 'First reply',
-    userId: 'user2',
-    userName: 'User Two',
-    createdAt: new Date().toISOString(),
-    reactions: {}
-  }
-];
-
-const mockOnClose = jest.fn();
-const mockOnReactionUpdate = jest.fn();
-const mockOnSendReply = jest.fn().mockImplementation(() => Promise.resolve());
+// Mock useSupabaseAuth hook
+jest.mock('@/hooks/useSupabaseAuth');
 
 describe('ThreadWindow', () => {
+  const mockParentMessage = {
+    id: '1',
+    content: 'Parent message',
+    created_at: new Date().toISOString(),
+    user_id: 'test-user-id',
+    channel_id: 'test-channel',
+    user: {
+      id: 'test-user-id',
+      name: 'Test User',
+      email: 'test@example.com'
+    }
+  };
+
+  const mockReplies = [
+    {
+      id: '2',
+      content: 'Reply message',
+      created_at: new Date().toISOString(),
+      user_id: 'test-user-id-2',
+      parent_id: '1',
+      user: {
+        id: 'test-user-id-2',
+        name: 'Test User 2',
+        email: 'test2@example.com'
+      }
+    }
+  ];
+
   beforeEach(() => {
+    (useSupabaseAuth as jest.Mock).mockReturnValue({
+      userId: 'test-user-id',
+      isLoaded: true,
+      isSignedIn: true
+    });
+
+    // Mock fetch for message sending
+    global.fetch = jest.fn(() =>
+      Promise.resolve({
+        ok: true,
+        json: () => Promise.resolve({ message: 'Reply sent' })
+      })
+    ) as jest.Mock;
+  });
+
+  afterEach(() => {
     jest.clearAllMocks();
   });
 
-  it('renders parent message and replies', () => {
+  it('renders parent message and replies correctly', () => {
     render(
       <ThreadWindow
-        parentMessage={mockParentMessage}
-        replies={mockReplies}
-        currentUserId="user1"
-        onSendReply={mockOnSendReply}
-        onReactionUpdate={mockOnReactionUpdate}
-        onClose={mockOnClose}
+        messageId="1"
+        onClose={jest.fn()}
       />
     );
 
     expect(screen.getByText('Parent message')).toBeInTheDocument();
-    expect(screen.getByText('First reply')).toBeInTheDocument();
-  });
-
-  it('closes thread window when close button is clicked', () => {
-    render(
-      <ThreadWindow
-        parentMessage={mockParentMessage}
-        replies={mockReplies}
-        currentUserId="user1"
-        onSendReply={mockOnSendReply}
-        onReactionUpdate={mockOnReactionUpdate}
-        onClose={mockOnClose}
-      />
-    );
-
-    const closeButton = screen.getByLabelText('Close thread');
-    fireEvent.click(closeButton);
-
-    expect(mockOnClose).toHaveBeenCalled();
+    expect(screen.getByText('Reply message')).toBeInTheDocument();
   });
 
   it('allows sending replies', async () => {
     render(
       <ThreadWindow
-        parentMessage={mockParentMessage}
-        replies={mockReplies}
-        currentUserId="user1"
-        onSendReply={mockOnSendReply}
-        onReactionUpdate={mockOnReactionUpdate}
-        onClose={mockOnClose}
+        messageId="1"
+        onClose={jest.fn()}
       />
     );
 
-    const input = screen.getByPlaceholderText('Reply in thread...');
-    fireEvent.change(input, { target: { value: 'New reply' } });
-    
-    const form = input.closest('form');
-    await act(async () => {
-      fireEvent.submit(form!);
-    });
+    const input = screen.getByPlaceholderText(/reply to thread/i);
+    const sendButton = screen.getByRole('button', { name: /send/i });
 
-    expect(mockOnSendReply).toHaveBeenCalledWith('New reply');
+    fireEvent.change(input, { target: { value: 'New reply' } });
+    fireEvent.click(sendButton);
+
+    await waitFor(() => {
+      expect(global.fetch).toHaveBeenCalledWith(
+        '/api/messages/1/replies',
+        expect.objectContaining({
+          method: 'POST',
+          body: JSON.stringify({ content: 'New reply' })
+        })
+      );
+    });
   });
 
-  it('shows emoji reaction options on hover', () => {
+  it('calls onClose when close button is clicked', () => {
+    const mockOnClose = jest.fn();
     render(
       <ThreadWindow
-        parentMessage={mockParentMessage}
-        replies={mockReplies}
-        currentUserId="user1"
-        onSendReply={mockOnSendReply}
-        onReactionUpdate={mockOnReactionUpdate}
+        messageId="1"
         onClose={mockOnClose}
       />
     );
 
-    const message = screen.getByText('Parent message');
-    fireEvent.mouseEnter(message.parentElement!);
+    const closeButton = screen.getByRole('button', { name: /close/i });
+    fireEvent.click(closeButton);
 
-    const reactionButtons = screen.getAllByTitle('Add reaction');
-    expect(reactionButtons[0]).toBeInTheDocument();
+    expect(mockOnClose).toHaveBeenCalled();
   });
 }); 

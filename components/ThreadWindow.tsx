@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send, X } from "lucide-react";
 import { MessageReactions } from "./MessageReactions";
 import { cn } from "@/lib/utils";
 import { UserName } from "./UserName";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 
 type Message = {
   id: string;
@@ -22,41 +23,76 @@ type Message = {
 };
 
 interface ThreadWindowProps {
-  parentMessage: Message;
-  replies: Message[];
-  currentUserId: string;
-  onSendReply: (content: string) => Promise<void>;
-  onReactionUpdate: (messageId: string, updatedReactions: Message['reactions']) => void;
+  messageId: string;
   onClose: () => void;
 }
 
 export function ThreadWindow({
-  parentMessage,
-  replies,
-  currentUserId,
-  onSendReply,
-  onReactionUpdate,
+  messageId,
   onClose,
 }: ThreadWindowProps) {
   const [newReply, setNewReply] = useState("");
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
+  const [parentMessage, setParentMessage] = useState<Message | null>(null);
+  const [replies, setReplies] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const { userId } = useSupabaseAuth();
+
+  useEffect(() => {
+    const fetchThreadMessages = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/messages/${messageId}/thread`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch thread messages');
+        }
+        const data = await response.json();
+        setParentMessage(data.parentMessage);
+        setReplies(data.replies);
+      } catch (error) {
+        console.error('Error fetching thread messages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchThreadMessages();
+
+    // Set up real-time subscription
+    // TODO: Implement Supabase real-time subscription for thread messages
+  }, [messageId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!newReply.trim()) return;
 
-    // If replying to a specific reply, add @username
-    const replyContent = replyingTo 
-      ? `@${replyingTo.userName} ${newReply}`
-      : newReply;
+    try {
+      // If replying to a specific reply, add @username
+      const replyContent = replyingTo 
+        ? `@${replyingTo.userName} ${newReply}`
+        : newReply;
 
-    await onSendReply(replyContent);
-    setNewReply(""); // Clear input after sending
-    setReplyingTo(null); // Clear replyingTo state
+      const response = await fetch(`/api/messages/${messageId}/replies`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: replyContent }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send reply');
+      }
+
+      setNewReply(""); // Clear input after sending
+      setReplyingTo(null); // Clear replyingTo state
+    } catch (error) {
+      console.error('Error sending reply:', error);
+    }
   };
 
   const handleReactionSelect = async (messageId: string, emoji: string) => {
-    const message = messageId === parentMessage.id ? parentMessage : replies.find(r => r.id === messageId);
+    const message = messageId === parentMessage?.id ? parentMessage : replies.find(r => r.id === messageId);
     if (!message) return;
 
     const existingReaction = message.reactions[emoji];
@@ -64,11 +100,11 @@ export function ThreadWindow({
     
     if (existingReaction) {
       // Toggle user's reaction
-      const userIndex = existingReaction.userIds.indexOf(currentUserId);
+      const userIndex = existingReaction.userIds.indexOf(userId || '');
       if (userIndex >= 0) {
         updatedReactions[emoji] = {
           ...existingReaction,
-          userIds: existingReaction.userIds.filter(id => id !== currentUserId)
+          userIds: existingReaction.userIds.filter(id => id !== userId)
         };
         // Remove reaction if no users left
         if (updatedReactions[emoji].userIds.length === 0) {
@@ -77,23 +113,39 @@ export function ThreadWindow({
       } else {
         updatedReactions[emoji] = {
           ...existingReaction,
-          userIds: [...existingReaction.userIds, currentUserId]
+          userIds: [...existingReaction.userIds, userId || '']
         };
       }
     } else {
       // Add new reaction
       updatedReactions[emoji] = {
         emoji,
-        userIds: [currentUserId]
+        userIds: [userId || '']
       };
     }
 
-    // Update through parent component
-    await onReactionUpdate(messageId, updatedReactions);
+    try {
+      const response = await fetch(`/api/messages/${messageId}/reactions`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          emoji,
+          action: existingReaction?.userIds.includes(userId || '') ? 'remove' : 'add'
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update reaction');
+      }
+    } catch (error) {
+      console.error('Error updating reaction:', error);
+    }
   };
 
   const renderMessage = (message: Message, isParent: boolean = false) => {
-    const isCurrentUser = message.userId === currentUserId;
+    const isCurrentUser = message.userId === userId;
 
     return (
       <div
@@ -135,7 +187,7 @@ export function ThreadWindow({
               {isCurrentUser && (
                 <MessageReactions
                   messageId={message.id}
-                  currentUserId={currentUserId}
+                  currentUserId={userId || ''}
                   onReactionSelect={handleReactionSelect}
                   align="start"
                 />
@@ -157,7 +209,7 @@ export function ThreadWindow({
               {!isCurrentUser && (
                 <MessageReactions
                   messageId={message.id}
-                  currentUserId={currentUserId}
+                  currentUserId={userId || ''}
                   onReactionSelect={handleReactionSelect}
                   align="end"
                 />
@@ -177,7 +229,7 @@ export function ThreadWindow({
                 className={cn(
                   "inline-flex items-center gap-1 px-2 py-1 rounded text-sm",
                   "border-2 border-black hover:bg-white/50 transition-colors",
-                  reaction.userIds.includes(currentUserId) && "bg-white/50"
+                  reaction.userIds.includes(userId || '') && "bg-white/50"
                 )}
               >
                 <span>{emoji}</span>
@@ -191,6 +243,14 @@ export function ThreadWindow({
       </div>
     );
   };
+
+  if (!parentMessage || isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full bg-[#D5C6B3]">
+        <div className="w-12 h-12 rounded-full bg-gradient-to-r from-yellow-300 to-purple-500 animate-glow" />
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-full bg-[#D5C6B3]">

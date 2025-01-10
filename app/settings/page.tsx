@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { useAuth } from "@clerk/nextjs";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useRouter } from "next/navigation";
 import { LoadingBall } from "@/components/ui/loading";
 import { Sidebar } from "@/components/Sidebar";
@@ -21,77 +21,48 @@ interface UserSettings {
 }
 
 export default function SettingsPage() {
-  const { isLoaded, userId } = useAuth();
+  const { user, isLoaded } = useSupabaseAuth();
   const router = useRouter();
   const [settings, setSettings] = useState<UserSettings>({
     bio: "",
     status_message: "",
     status_emoji: "",
-    avatar_url: null
+    avatar_url: null,
   });
-  const [isUploading, setIsUploading] = useState(false);
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
-    if (isLoaded && !userId) {
+    if (isLoaded && !user) {
       router.push('/sign-in');
-    } else if (userId) {
-      // Fetch user settings
-      fetchUserSettings();
+      return;
     }
-  }, [isLoaded, userId, router]);
 
-  const fetchUserSettings = async () => {
-    try {
-      const response = await fetch('/api/users/me');
-      if (response.ok) {
+    // Fetch user settings
+    const fetchSettings = async () => {
+      try {
+        const response = await fetch('/api/users/me');
+        if (!response.ok) throw new Error('Failed to fetch user settings');
         const data = await response.json();
         setSettings({
           bio: data.bio || "",
           status_message: data.status_message || "",
           status_emoji: data.status_emoji || "",
-          avatar_url: data.avatar_url || null
+          avatar_url: data.avatar_url,
         });
+      } catch (error) {
+        console.error('Error fetching user settings:', error);
       }
-    } catch (error) {
-      console.error('Error fetching user settings:', error);
+    };
+
+    if (user) {
+      fetchSettings();
     }
-  };
+  }, [isLoaded, user, router]);
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
+  const handleSave = async () => {
     try {
-      const formData = new FormData();
-      formData.append('file', file);
-
-      const response = await fetch('/api/users/me/avatar', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Avatar upload failed:', errorText);
-        throw new Error(errorText);
-      }
-
-      const data = await response.json();
-      setSettings(prev => ({ ...prev, avatar_url: data.avatar_url }));
-    } catch (error) {
-      console.error('Error uploading avatar:', error);
-      // Show error to user (you might want to add a toast or error message UI)
-      alert(error instanceof Error ? error.message : 'Failed to upload avatar');
-    } finally {
-      setIsUploading(false);
-    }
-  };
-
-  const handleSaveSettings = async () => {
-    try {
-      setSaveStatus('saving');
+      setIsSaving(true);
       const response = await fetch('/api/users/me', {
         method: 'PATCH',
         headers: {
@@ -100,184 +71,129 @@ export default function SettingsPage() {
         body: JSON.stringify(settings),
       });
 
-      if (!response.ok) {
-        throw new Error('Failed to update settings');
-      }
-
-      setSaveStatus('success');
-      // Reset status after 3 seconds
-      setTimeout(() => setSaveStatus('idle'), 3000);
+      if (!response.ok) throw new Error('Failed to update settings');
+      router.refresh();
     } catch (error) {
       console.error('Error saving settings:', error);
-      setSaveStatus('error');
-      // Reset status after 3 seconds
-      setTimeout(() => setSaveStatus('idle'), 3000);
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDelete = async () => {
     try {
+      setIsDeleting(true);
       const response = await fetch('/api/users/me', {
         method: 'DELETE',
       });
 
-      if (response.ok) {
-        router.push('/sign-in');
-      }
+      if (!response.ok) throw new Error('Failed to delete account');
+      router.push('/sign-in');
     } catch (error) {
       console.error('Error deleting account:', error);
+    } finally {
+      setIsDeleting(false);
     }
   };
 
-  const handleRemoveAvatar = async () => {
-    try {
-      const response = await fetch('/api/users/me/avatar', {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to remove avatar');
-      }
-
-      const data = await response.json();
-      setSettings(prev => ({ ...prev, avatar_url: data.avatar_url }));
-    } catch (error) {
-      console.error('Error removing avatar:', error);
-      alert('Failed to remove profile picture');
-    }
-  };
-
-  // Show loading state while checking auth
   if (!isLoaded) {
     return <LoadingBall />;
   }
 
-  // Return null while redirecting to sign-in
-  if (!userId) {
+  if (!user) {
     return null;
   }
 
   return (
     <div className="flex h-full">
       <Sidebar />
-      <div className="flex-1 p-6 bg-[#F5E6D3]">
-        <div className="max-w-2xl mx-auto space-y-8">
-          <h1 className="text-2xl font-bold">User Settings</h1>
+      <div className="flex-1 p-6 bg-[#F5E6D3] overflow-y-auto">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <h1 className="text-2xl font-bold mb-6">Settings</h1>
 
-          {/* Profile Picture Section */}
-          <div className="space-y-4 bg-white/90 p-6 rounded-lg shadow-sm">
-            <h2 className="text-lg font-semibold">Profile Picture</h2>
-            <div className="flex items-center gap-4">
-              <div className="relative w-24 h-24">
-                <Image
-                  src={settings.avatar_url || "/default-avatar.jpeg"}
-                  alt="Profile"
-                  fill
-                  sizes="96px"
-                  className="rounded-full object-cover border-2 border-gray-200"
-                  priority
-                  unoptimized={!settings.avatar_url}
-                />
-              </div>
-              <div className="space-y-4">
-                <Input
-                  type="file"
-                  accept="image/*"
-                  onChange={handleAvatarUpload}
-                  disabled={isUploading}
-                  className="bg-white"
-                />
-                <p className="text-sm text-gray-500">
-                  {isUploading ? 'Uploading...' : 'Upload a new profile picture'}
-                </p>
-                {settings.avatar_url && settings.avatar_url !== '/default-avatar.jpeg' && (
-                  <Button
-                    variant="outline"
-                    onClick={handleRemoveAvatar}
-                    className="w-full text-red-600 hover:text-red-700 hover:bg-red-50"
-                  >
-                    Remove Profile Picture
-                  </Button>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Bio Section */}
-          <div className="space-y-4 bg-white/90 p-6 rounded-lg shadow-sm">
-            <h2 className="text-lg font-semibold">Bio</h2>
-            <Textarea
-              value={settings.bio}
-              onChange={(e) => setSettings(prev => ({ ...prev, bio: e.target.value }))}
-              placeholder="Tell us about yourself..."
-              className="min-h-[100px] bg-white"
-            />
-          </div>
-
-          {/* Status Section */}
-          <div className="space-y-4 bg-white/90 p-6 rounded-lg shadow-sm">
-            <h2 className="text-lg font-semibold">Status</h2>
-            <div className="flex items-center gap-2">
-              <div className="w-10">
-                <EmojiPicker
-                  value={settings.status_emoji}
-                  onChange={(emoji) => setSettings(prev => ({ ...prev, status_emoji: emoji }))}
-                />
-              </div>
-              <Input
-                value={settings.status_message}
-                onChange={(e) => setSettings(prev => ({ ...prev, status_message: e.target.value.slice(0, 25) }))}
-                placeholder="What's your status?"
-                maxLength={25}
-                className="bg-white"
+          <div className="space-y-4 bg-white p-6 rounded-lg shadow">
+            <div className="space-y-2">
+              <Label htmlFor="bio">Bio</Label>
+              <Textarea
+                id="bio"
+                value={settings.bio}
+                onChange={(e) => setSettings({ ...settings, bio: e.target.value })}
+                placeholder="Tell us about yourself..."
+                className="min-h-[100px]"
               />
             </div>
-            <p className="text-sm text-gray-500">
-              {25 - settings.status_message.length} characters remaining
-            </p>
-          </div>
 
-          {/* Save Button */}
-          <div className="space-y-2">
-            <Button 
-              onClick={handleSaveSettings} 
-              className="w-full"
-              disabled={saveStatus === 'saving'}
-            >
-              {saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
-            </Button>
-            {saveStatus === 'success' && (
-              <p className="text-sm text-green-600 text-center">Settings saved successfully!</p>
-            )}
-            {saveStatus === 'error' && (
-              <p className="text-sm text-red-600 text-center">Failed to save settings. Please try again.</p>
-            )}
-          </div>
+            <div className="space-y-2">
+              <Label htmlFor="status">Status Message</Label>
+              <div className="flex gap-2">
+                <Input
+                  id="status"
+                  value={settings.status_message}
+                  onChange={(e) => setSettings({ ...settings, status_message: e.target.value })}
+                  placeholder="What's happening?"
+                  maxLength={25}
+                />
+                <EmojiPicker
+                  value={settings.status_emoji}
+                  onChange={(emoji) => setSettings({ ...settings, status_emoji: emoji })}
+                />
+              </div>
+            </div>
 
-          {/* Delete Account Section */}
-          <div className="pt-8">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button variant="destructive" className="w-full">
-                  ⚠️ Delete Account
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    This action cannot be undone. This will permanently delete your
-                    account and remove all of your data from our servers.
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteAccount} className="bg-red-600 hover:bg-red-700">
-                    Yes, delete my account
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
+            <div className="space-y-2">
+              <Label htmlFor="avatar">Avatar URL</Label>
+              <Input
+                id="avatar"
+                value={settings.avatar_url || ""}
+                onChange={(e) => setSettings({ ...settings, avatar_url: e.target.value })}
+                placeholder="https://example.com/avatar.jpg"
+              />
+              {settings.avatar_url && (
+                <div className="mt-2">
+                  <Image
+                    src={settings.avatar_url}
+                    alt="Avatar preview"
+                    width={100}
+                    height={100}
+                    className="rounded-full"
+                  />
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-between items-center pt-4">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button variant="destructive">Delete Account</Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete your
+                      account and remove your data from our servers.
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction
+                      onClick={handleDelete}
+                      className="bg-red-500 hover:bg-red-600"
+                      disabled={isDeleting}
+                    >
+                      {isDeleting ? "Deleting..." : "Delete Account"}
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+              >
+                {isSaving ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
           </div>
         </div>
       </div>

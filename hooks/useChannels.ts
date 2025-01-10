@@ -1,101 +1,77 @@
-import { useEffect, useState } from 'react';
-import type { Database } from '@/types/supabase';
-import { useAuth } from '@clerk/nextjs';
+'use client';
 
-type Channel = Database['public']['Tables']['channels']['Row'];
+import { useState, useEffect } from 'react';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/types/supabase';
 
 export function useChannels() {
-  const [channels, setChannels] = useState<Channel[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [channels, setChannels] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
-  const { userId } = useAuth();
+  const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
-    async function fetchChannels() {
+    const fetchChannels = async () => {
       try {
-        console.log('=== DEBUG: FETCH CHANNELS START ===');
-        console.log('Authenticated user ID:', userId);
-        
-        if (!userId) {
-          throw new Error('Not authenticated');
-        }
+        setIsLoading(true);
+        const { data, error } = await supabase
+          .from('channels')
+          .select('*')
+          .order('created_at', { ascending: true });
 
-        // Fetch channels from our API endpoint
-        const response = await fetch('/api/channels');
-        if (!response.ok) {
-          throw new Error(`Error fetching channels: ${response.statusText}`);
-        }
-
-        const data = await response.json();
-        console.log('Channels fetched:', data);
+        if (error) throw error;
         setChannels(data || []);
-        console.log('=== DEBUG: FETCH CHANNELS END ===');
       } catch (err) {
-        console.error('Error in fetchChannels:', err);
-        setError(err instanceof Error ? err : new Error('Failed to fetch channels'));
+        setError(err as Error);
       } finally {
-        setLoading(false);
+        setIsLoading(false);
       }
-    }
+    };
 
-    if (userId) {
-      fetchChannels();
-    } else {
-      console.log('No userId, skipping channel fetch');
-      setLoading(false);
-      setChannels([]);
-    }
-  }, [userId]);
+    fetchChannels();
+
+    // Subscribe to changes
+    const subscription = supabase
+      .channel('channels')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
+        fetchChannels();
+      })
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [supabase]);
 
   const addChannel = async (name: string) => {
     try {
-      console.log('Adding new channel:', name);
-      if (!userId) throw new Error('Not authenticated');
+      const { data, error } = await supabase
+        .from('channels')
+        .insert([{ name }])
+        .select()
+        .single();
 
-      const response = await fetch('/api/channels', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name,
-          description: '',
-          is_private: false
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error creating channel: ${response.statusText}`);
-      }
-
-      const channel = await response.json();
-      console.log('Channel created:', channel);
-      return channel;
+      if (error) throw error;
+      return data;
     } catch (err) {
-      console.error('Error in addChannel:', err);
+      console.error('Error adding channel:', err);
       throw err;
     }
   };
 
   const deleteChannel = async (channelId: string) => {
     try {
-      console.log('Deleting channel:', channelId);
-      if (!userId) throw new Error('Not authenticated');
+      const { error } = await supabase
+        .from('channels')
+        .delete()
+        .eq('id', channelId);
 
-      const response = await fetch(`/api/channels/${channelId}`, {
-        method: 'DELETE'
-      });
-
-      if (!response.ok) {
-        throw new Error(`Error deleting channel: ${response.statusText}`);
-      }
-
-      console.log('Channel deleted successfully');
+      if (error) throw error;
     } catch (err) {
-      console.error('Error in deleteChannel:', err);
+      console.error('Error deleting channel:', err);
       throw err;
     }
   };
 
-  return { channels, loading, error, addChannel, deleteChannel };
+  return { channels, isLoading, error, addChannel, deleteChannel };
 } 

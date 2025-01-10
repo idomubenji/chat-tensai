@@ -2,7 +2,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
-import { useAuth } from "@clerk/nextjs";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { cn } from "@/lib/utils";
 import { MessageReactions } from "./MessageReactions";
 import { MessageReplyButton } from "./MessageReplyButton";
@@ -28,29 +28,21 @@ type Message = {
 
 interface ChatWindowProps {
   channelId: string;
-  messages: Message[];
-  onSendMessage: (content: string) => Promise<void>;
-  onReactionUpdate: (messageId: string, updatedReactions: Message['reactions']) => void;
-  onMessageUpdate?: (messageId: string, updates: Partial<Message>) => void;
-  selectedMessage: Message | null;
-  onSelectMessage: (message: Message | null) => void;
-  isLoading?: boolean;
+  onMessageSelect: (messageId: string) => void;
+  selectedMessageId: string | null;
 }
 
 export function ChatWindow({
   channelId,
-  messages,
-  onSendMessage,
-  onReactionUpdate,
-  onMessageUpdate,
-  selectedMessage,
-  onSelectMessage,
-  isLoading = false,
+  onMessageSelect,
+  selectedMessageId,
 }: ChatWindowProps) {
   const [newMessage, setNewMessage] = useState("");
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { userId } = useAuth();
+  const { userId } = useSupabaseAuth();
 
   useEffect(() => {
     if (isLoading) {
@@ -73,7 +65,7 @@ export function ChatWindow({
   const handleSelectMessage = (message: Message) => {
     const latestMessage = messages.find(m => m.id === message.id);
     if (latestMessage) {
-      onSelectMessage(latestMessage);
+      onMessageSelect(latestMessage.id);
     }
   };
 
@@ -81,8 +73,23 @@ export function ChatWindow({
     e.preventDefault();
     if (!newMessage.trim()) return;
 
-    await onSendMessage(newMessage);
-    setNewMessage(""); // Clear input after sending
+    try {
+      const response = await fetch(`/api/channels/${channelId}/messages`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content: newMessage }),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to send message');
+      }
+
+      setNewMessage(""); // Clear input after sending
+    } catch (error) {
+      console.error('Error sending message:', error);
+    }
   };
 
   const handleReactionSelect = async (messageId: string, emoji: string) => {
@@ -119,9 +126,6 @@ export function ChatWindow({
         };
       }
 
-      // Update through parent component
-      onReactionUpdate(messageId, updatedReactions);
-
       // Send update to server
       const response = await fetch(`/api/channels/${channelId}/messages`, {
         method: 'PUT',
@@ -142,6 +146,30 @@ export function ChatWindow({
       console.error('Error adding reaction:', error);
     }
   };
+
+  // Fetch messages
+  useEffect(() => {
+    const fetchMessages = async () => {
+      try {
+        setIsLoading(true);
+        const response = await fetch(`/api/channels/${channelId}/messages`);
+        if (!response.ok) {
+          throw new Error('Failed to fetch messages');
+        }
+        const data = await response.json();
+        setMessages(data.messages);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchMessages();
+
+    // Set up real-time subscription
+    // TODO: Implement Supabase real-time subscription for messages
+  }, [channelId]);
 
   if (isLoading || isTransitioning) {
     return (

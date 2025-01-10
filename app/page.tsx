@@ -2,13 +2,13 @@
 
 import { useEffect } from "react";
 import { TopBar } from "@/components/TopBar";
-import { useAuth } from "@clerk/nextjs";
+import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
 import { useRouter } from "next/navigation";
 import { LoadingBall } from "@/components/ui/loading";
 import { Sidebar } from "@/components/Sidebar";
 
 export default function Home() {
-  const { isLoaded, userId } = useAuth();
+  const { isLoaded, userId } = useSupabaseAuth();
   const router = useRouter();
 
   useEffect(() => {

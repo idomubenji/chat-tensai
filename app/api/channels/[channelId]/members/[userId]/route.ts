@@ -1,15 +1,15 @@
-import { auth } from '@clerk/nextjs';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { getAuthUserId } from '@/lib/auth';
 
 export async function PATCH(
   req: Request,
   { params }: { params: { channelId: string; userId: string } }
 ) {
   try {
-    const { userId: currentUserId } = auth();
+    const currentUserId = await getAuthUserId();
     if (!currentUserId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
@@ -62,7 +62,7 @@ export async function DELETE(
   { params }: { params: { channelId: string; userId: string } }
 ) {
   try {
-    const { userId: currentUserId } = auth();
+    const currentUserId = await getAuthUserId();
     if (!currentUserId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }

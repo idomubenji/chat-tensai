@@ -1,38 +1,35 @@
-import { auth } from '@clerk/nextjs';
+import { NextResponse } from 'next/server';
 import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
 
-export async function PATCH(req: Request) {
+export async function GET(request: Request) {
   try {
-    const { userId } = auth();
-    if (!userId) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    const body = await req.json();
-    const { status } = body;
-
-    if (!status || !['ONLINE', 'AWAY', 'OFFLINE'].includes(status)) {
-      return new NextResponse('Invalid status', { status: 400 });
-    }
-
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-
-    // Update user status
-    const { data: user, error: updateError } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
-      .update({ status })
-      .eq('id', userId)
-      .select()
+      .select('*')
+      .eq('id', session.user.id)
       .single();
 
-    if (updateError) throw updateError;
+    if (error) {
+      console.error('Error fetching user status:', error);
+      return new NextResponse('Internal Server Error', { status: 500 });
+    }
 
-    return NextResponse.json(user);
+    return NextResponse.json({
+      id: user.id,
+      status: user.status || 'online',
+      lastSeen: user.last_seen_at
+    });
   } catch (error) {
-    console.error('Error updating user status:', error);
+    console.error('Error in status route:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 } 
