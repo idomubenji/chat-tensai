@@ -63,27 +63,23 @@ jobs:
             public \
             app \
             components \
-            hooks \
             lib \
-            styles \
+            hooks \
             types \
-            utils \
-            package.json \
-            package-lock.json \
             .env.production \
             next.config.mjs \
             middleware.ts \
+            package.json \
+            package-lock.json \
             ecosystem.config.js \
-            components.json \
             tailwind.config.ts \
             postcss.config.mjs \
             tsconfig.json \
-            server.js \
-            .eslintrc.json \
-            next-env.d.ts \
-            jest.setup.js \
-            supabase
-          
+            next-env.d.ts
+
+          # Debug: List contents of tar file
+          tar -tvf deploy.tar.gz
+
           # Copy deployment package
           scp -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
           
