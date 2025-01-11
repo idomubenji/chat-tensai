@@ -1,17 +1,14 @@
 module.exports = {
   apps: [{
     name: 'chat-genius',
-    cwd: '/home/ec2-user/chat-genius',
-    script: 'npm',
-    args: 'run start:next -- -p 3000',
+    script: 'server.js',
     instances: 1,
     autorestart: true,
     watch: false,
     max_memory_restart: '1G',
-    env: {
+    env_production: {
       NODE_ENV: 'production',
-      PORT: 3000,
-      NEXT_TELEMETRY_DISABLED: 1
+      PORT: 3000
     }
   }]
 } 

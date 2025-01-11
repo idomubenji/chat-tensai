@@ -1,6 +1,4 @@
 # Deploy to EC2
-# Updated: Testing GitHub Actions deployment after security group update
-
 name: Deploy to EC2
 
 on:
@@ -36,27 +34,12 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          # Start SSH agent
           ssh-agent -a $SSH_AUTH_SOCK > /dev/null
-          
-          # Debug: Show current IP
-          echo "Current GitHub Actions IP:"
-          curl -s https://api.ipify.org
-          
-          # Setup SSH key with stricter permissions
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          
-          # Add key to agent
           ssh-add ~/.ssh/deploy_key
-          
-          # Disable strict host key checking for initial connection
-          echo "Scanning host key..."
-          mkdir -p ~/.ssh
           ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
-          
-          # Test connection with 30s timeout
           ssh -o ConnectTimeout=30 ec2-user@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
       
       - name: Create env file
@@ -70,40 +53,40 @@ jobs:
           AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
           NODE_ENV=production
+          PORT=3000
           EOL
 
       - name: Deploy to EC2
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
+          # Copy setup script first
+          scp -o ConnectTimeout=30 scripts/setup-nginx.sh ec2-user@${{ secrets.EC2_HOST }}:~
+          
           # Create deployment package
           tar -czf deploy.tar.gz \
-            .next \
+            .next/standalone \
+            .next/static \
             public \
-            app \
-            components \
-            lib \
-            hooks \
-            types \
             .env.production \
-            next.config.mjs \
-            middleware.ts \
-            package.json \
-            package-lock.json \
-            ecosystem.config.js \
-            tailwind.config.ts \
-            postcss.config.mjs \
-            tsconfig.json \
-            next-env.d.ts
+            ecosystem.config.js
 
-          # Copy with progress and specific timeout
+          # Copy deployment package
           scp -o ConnectTimeout=30 deploy.tar.gz ec2-user@${{ secrets.EC2_HOST }}:~
           
           # Deploy with error handling
           ssh -o ConnectTimeout=30 ec2-user@${{ secrets.EC2_HOST }} '
             set -e
+            
+            # Setup Nginx if not already done
+            if [ ! -f /etc/nginx/conf.d/chat-genius.conf ]; then
+              echo "Setting up Nginx..."
+              chmod +x ~/setup-nginx.sh
+              sudo ~/setup-nginx.sh
+            fi
+            
             echo "Stopping existing application..."
-            pm2 stop chat-genius 2>/dev/null || true
+            sudo pm2 stop chat-genius 2>/dev/null || true
             
             echo "Cleaning up old deployment..."
             rm -rf ~/chat-genius
@@ -113,11 +96,20 @@ jobs:
             tar -xzf deploy.tar.gz -C ~/chat-genius
             cd ~/chat-genius
             
-            echo "Installing dependencies..."
-            npm ci --production
+            echo "Setting up static files..."
+            mkdir -p .next/standalone/.next/static
+            cp -r .next/static/* .next/standalone/.next/static/
+            cp -r public/* .next/standalone/public/
+            cp .env.production .next/standalone/
+            cp ecosystem.config.js .next/standalone/
             
             echo "Starting application..."
-            pm2 start npm --name "chat-genius" -- start && pm2 save
+            sudo pm2 delete chat-genius 2>/dev/null || true
+            cd .next/standalone
+            sudo -E NODE_ENV=production pm2 start server.js --name "chat-genius" && sudo pm2 save
+            
+            echo "Restarting Nginx..."
+            sudo systemctl restart nginx
             
             echo "Deployment complete!"
           ' 
