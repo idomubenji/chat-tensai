@@ -38,6 +38,11 @@ jobs:
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
           echo "${{ secrets.EC2_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
+          # Print IP address and add verbose SSH debugging
+          echo "GitHub Actions IP address:"
+          curl -s https://api.ipify.org
+          echo "Testing SSH connection with verbose output:"
+          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST 'echo "test"' || true
       
       - name: Create env file
         run: |
@@ -80,11 +85,11 @@ jobs:
           # Debug: List contents of tar file
           tar -tvf deploy.tar.gz
 
-          # Copy deployment package
-          scp -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
+          # Add verbose flags to SSH commands
+          scp -v -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
           
           # Deploy on EC2
-          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
+          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
             # Stop existing application
             pm2 stop chat-genius 2>/dev/null || true
             
