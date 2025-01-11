@@ -98,10 +98,16 @@ jobs:
             
             echo "Setting up static files..."
             mkdir -p .next/standalone/.next/static
-            cp -r .next/static/* .next/standalone/.next/static/
-            cp -r public/* .next/standalone/public/
-            cp .env.production .next/standalone/
-            cp ecosystem.config.js .next/standalone/
+            mkdir -p .next/standalone/public
+            
+            # Copy static files with verbose output for debugging
+            echo "Copying static files..."
+            cp -rv .next/static/* .next/standalone/.next/static/
+            cp -rv public/* .next/standalone/public/
+            
+            echo "Copying configuration files..."
+            cp -v .env.production .next/standalone/
+            cp -v ecosystem.config.js .next/standalone/
             
             echo "Starting application..."
             sudo pm2 delete chat-genius 2>/dev/null || true
@@ -112,4 +118,8 @@ jobs:
             sudo systemctl restart nginx
             
             echo "Deployment complete!"
+            
+            # Print directory structure for verification
+            echo "Verifying directory structure:"
+            ls -R .next/
           ' 
