@@ -10,17 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     env:
       NODE_OPTIONS: --max_old_space_size=4096
-      NEXT_DISABLE_ESLINT: 1
-      NEXT_DISABLE_TYPE_CHECKS: 1
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
-      NEXT_PUBLIC_PRODUCTION_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
-      NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
-      PRODUCTION_SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
     
     steps:
       - uses: actions/checkout@v3
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '18'
+          cache: 'npm'
+      
+      - name: Install dependencies
+        run: npm ci
+      
+      - name: Build application
+        run: npm run build
       
       - name: Setup SSH
         run: |
@@ -31,68 +38,56 @@ jobs:
       
       - name: Create env file
         run: |
-          # Create env file in workspace directory
-          touch $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "PRODUCTION_SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}" >> $GITHUB_WORKSPACE/.env.production
-          echo "NODE_OPTIONS=--max_old_space_size=4096" >> $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_DISABLE_ESLINT=1" >> $GITHUB_WORKSPACE/.env.production
-          echo "NEXT_DISABLE_TYPE_CHECKS=1" >> $GITHUB_WORKSPACE/.env.production
-          
-          # Debug: Show file contents and location
-          echo "Environment file contents:"
-          cat $GITHUB_WORKSPACE/.env.production
-          echo "File location:"
-          ls -la $GITHUB_WORKSPACE/.env.production
-          
+          cat > .env.production << EOL
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
+          AWS_REGION=${{ secrets.AWS_REGION }}
+          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
+          NODE_ENV=production
+          EOL
+      
       - name: Deploy to EC2
         env:
           EC2_HOST: ${{ secrets.EC2_HOST }}
           EC2_USER: ec2-user
         run: |
-          # Debug: Show current directory and files
-          pwd
-          ls -la
+          # Create deployment package
+          tar -czf deploy.tar.gz \
+            .next \
+            public \
+            package.json \
+            package-lock.json \
+            .env.production \
+            next.config.mjs \
+            middleware.ts \
+            ecosystem.config.js \
+            components.json \
+            tailwind.config.ts \
+            postcss.config.mjs
           
-          # Copy deployment scripts
-          scp -i ~/.ssh/deploy_key scripts/setup-ec2.sh scripts/deploy.sh $EC2_USER@$EC2_HOST:~
+          # Copy deployment package
+          scp -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
           
-          # Copy environment file from workspace
-          scp -i ~/.ssh/deploy_key $GITHUB_WORKSPACE/.env.production $EC2_USER@$EC2_HOST:~/.env.production
-          
-          # Run setup if not already done
+          # Deploy on EC2
           ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
-            if [ ! -d "/var/www/chat-genius" ]; then
-              chmod +x ~/setup-ec2.sh
-              ~/setup-ec2.sh
-            fi
-          '
-          
-          # Deploy application
-          ssh -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
-            cd /var/www/chat-genius
+            # Stop existing application
+            pm2 stop chat-genius 2>/dev/null || true
             
-            # Pull latest changes
-            if [ -d ".git" ]; then
-              git pull
-            else
-              git clone ${{ secrets.REPO_URL }} .
-            fi
+            # Clean and create directory
+            rm -rf ~/chat-genius
+            mkdir -p ~/chat-genius
+            cd ~/chat-genius
             
-            # Debug: Show environment file
-            echo "Environment file contents on EC2:"
-            ls -la ~/.env.production
-            cat ~/.env.production
+            # Extract deployment package
+            tar -xzf ../deploy.tar.gz
             
-            # Copy env file and ensure it's loaded
-            cp ~/.env.production .env.production
-            source .env.production
+            # Install production dependencies
+            npm ci --production
             
-            # Run deployment
-            chmod +x scripts/deploy.sh
-            ./scripts/deploy.sh
+            # Start application
+            pm2 start npm --name "chat-genius" -- start
+            pm2 save
           ' 
