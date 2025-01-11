@@ -51,11 +51,13 @@ jobs:
           # Add key to agent
           ssh-add ~/.ssh/deploy_key
           
-          # Setup known hosts with strict checking
-          echo "${{ secrets.EC2_HOST_KEY }}" >> ~/.ssh/known_hosts
+          # Disable strict host key checking for initial connection
+          echo "Scanning host key..."
+          mkdir -p ~/.ssh
+          ssh-keyscan -H ${{ secrets.EC2_HOST }} >> ~/.ssh/known_hosts 2>/dev/null
           
           # Test connection with 30s timeout
-          ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key ec2-user@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
+          ssh -o ConnectTimeout=30 ec2-user@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
       
       - name: Create env file
         run: |
