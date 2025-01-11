@@ -12,7 +12,7 @@ node-installer/
 *.test.results.json
 
 # Environment Variables
-.env
+.env.local.backup
 .env*.local
 .env.development
 .env.test
