@@ -6,7 +6,7 @@ name: Deploy to EC2
 on:
   push:
     branches:
-      - main  # or your default branch
+      - main
 
 jobs:
   deploy:
@@ -31,21 +31,31 @@ jobs:
       
       - name: Build application
         run: npm run build
-      
+
       - name: Setup SSH
         env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ec2-user
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
+          # Start SSH agent
+          ssh-agent -a $SSH_AUTH_SOCK > /dev/null
+          
+          # Debug: Show current IP
+          echo "Current GitHub Actions IP:"
+          curl -s https://api.ipify.org
+          
+          # Setup SSH key with stricter permissions
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          echo "${{ secrets.EC2_KNOWN_HOSTS }}" > ~/.ssh/known_hosts
-          # Print IP address and add verbose SSH debugging
-          echo "GitHub Actions IP address:"
-          curl -s https://api.ipify.org
-          echo "Testing SSH connection with verbose output:"
-          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST 'echo "test"'
+          
+          # Add key to agent
+          ssh-add ~/.ssh/deploy_key
+          
+          # Setup known hosts with strict checking
+          echo "${{ secrets.EC2_HOST_KEY }}" >> ~/.ssh/known_hosts
+          
+          # Test connection with 30s timeout
+          ssh -o ConnectTimeout=30 -o StrictHostKeyChecking=yes -i ~/.ssh/deploy_key ec2-user@${{ secrets.EC2_HOST }} 'echo "SSH connection successful"'
       
       - name: Create env file
         run: |
@@ -59,11 +69,10 @@ jobs:
           AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
           NODE_ENV=production
           EOL
-      
+
       - name: Deploy to EC2
         env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ec2-user
+          SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
           # Create deployment package
           tar -czf deploy.tar.gz \
@@ -85,29 +94,28 @@ jobs:
             tsconfig.json \
             next-env.d.ts
 
-          # Debug: List contents of tar file
-          tar -tvf deploy.tar.gz
-
-          # Add verbose flags to SSH commands
-          scp -v -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
+          # Copy with progress and specific timeout
+          scp -o ConnectTimeout=30 deploy.tar.gz ec2-user@${{ secrets.EC2_HOST }}:~
           
-          # Deploy on EC2
-          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST '
-            # Stop existing application
+          # Deploy with error handling
+          ssh -o ConnectTimeout=30 ec2-user@${{ secrets.EC2_HOST }} '
+            set -e
+            echo "Stopping existing application..."
             pm2 stop chat-genius 2>/dev/null || true
             
-            # Clean and create directory
+            echo "Cleaning up old deployment..."
             rm -rf ~/chat-genius
             mkdir -p ~/chat-genius
+            
+            echo "Extracting new deployment..."
+            tar -xzf deploy.tar.gz -C ~/chat-genius
             cd ~/chat-genius
             
-            # Extract deployment package
-            tar -xzf ../deploy.tar.gz
-            
-            # Install production dependencies
+            echo "Installing dependencies..."
             npm ci --production
             
-            # Start application
-            pm2 start npm --name "chat-genius" -- start
-            pm2 save
+            echo "Starting application..."
+            pm2 start npm --name "chat-genius" -- start && pm2 save
+            
+            echo "Deployment complete!"
           ' 
