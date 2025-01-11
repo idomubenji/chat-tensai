@@ -1,8 +1,9 @@
 module.exports = {
   apps: [{
     name: 'chat-genius',
+    cwd: '/home/ec2-user/chat-genius',
     script: 'npm',
-    args: 'start',
+    args: 'run start:next -- -p 3000',
     instances: 1,
     autorestart: true,
     watch: false,
