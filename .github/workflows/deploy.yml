@@ -33,6 +33,9 @@ jobs:
         run: npm run build
       
       - name: Setup SSH
+        env:
+          EC2_HOST: ${{ secrets.EC2_HOST }}
+          EC2_USER: ec2-user
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.EC2_SSH_KEY }}" > ~/.ssh/deploy_key
@@ -42,7 +45,7 @@ jobs:
           echo "GitHub Actions IP address:"
           curl -s https://api.ipify.org
           echo "Testing SSH connection with verbose output:"
-          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST 'echo "test"' || true
+          ssh -v -i ~/.ssh/deploy_key $EC2_USER@$EC2_HOST 'echo "test"'
       
       - name: Create env file
         run: |
