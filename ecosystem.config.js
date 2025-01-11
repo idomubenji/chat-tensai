@@ -1,7 +1,7 @@
 module.exports = {
   apps: [{
     name: 'chat-genius',
-    script: 'node_modules/next/dist/bin/next',
+    script: 'npm',
     args: 'start',
     instances: 1,
     autorestart: true,
@@ -9,7 +9,8 @@ module.exports = {
     max_memory_restart: '1G',
     env: {
       NODE_ENV: 'production',
-      PORT: 3000
+      PORT: 3000,
+      NEXT_TELEMETRY_DISABLED: 1
     }
   }]
 } 

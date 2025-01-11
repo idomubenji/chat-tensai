@@ -61,6 +61,13 @@ jobs:
           tar -czf deploy.tar.gz \
             .next \
             public \
+            app \
+            components \
+            hooks \
+            lib \
+            styles \
+            types \
+            utils \
             package.json \
             package-lock.json \
             .env.production \
@@ -69,7 +76,13 @@ jobs:
             ecosystem.config.js \
             components.json \
             tailwind.config.ts \
-            postcss.config.mjs
+            postcss.config.mjs \
+            tsconfig.json \
+            server.js \
+            .eslintrc.json \
+            next-env.d.ts \
+            jest.setup.js \
+            supabase
           
           # Copy deployment package
           scp -i ~/.ssh/deploy_key deploy.tar.gz $EC2_USER@$EC2_HOST:~
