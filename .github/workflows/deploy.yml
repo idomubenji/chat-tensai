@@ -1,3 +1,6 @@
+# Deploy to EC2
+# Updated: Testing GitHub Actions deployment after security group update
+
 name: Deploy to EC2
 
 on:
