@@ -14,6 +14,7 @@ export function SignUpForm() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [username, setUsername] = useState('');
+  const [isConfirmationSent, setIsConfirmationSent] = useState(false);
   const { signUp, loading, error } = useSignUp();
   const router = useRouter();
   const supabase = createClientComponentClient();
@@ -35,9 +36,35 @@ export function SignUpForm() {
     e.preventDefault();
     const result = await signUp(email, password, username);
     if (result.success) {
-      router.push('/');
+      setIsConfirmationSent(true);
     }
   };
+
+  if (isConfirmationSent) {
+    return (
+      <div className="text-center space-y-4">
+        <div className="text-2xl font-semibold text-gray-900">
+          Check your email
+        </div>
+        <div className="text-gray-600">
+          We sent a confirmation link to <span className="font-medium">{email}</span>
+        </div>
+        <div className="text-sm text-gray-500">
+          Click the link in the email to verify your account and start using Chat Tensai.
+          <br />
+          If you don't see the email, check your spam folder.
+        </div>
+        <Button
+          type="button"
+          variant="outline"
+          className="mt-4"
+          onClick={() => window.location.href = 'https://mail.google.com'}
+        >
+          Open Gmail
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-4">

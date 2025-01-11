@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Confirm your Chat Tensai account</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
+  <div style="text-align: center; margin-bottom: 30px;">
+    <img src="{{ .SiteURL }}/chat-tensai-icon.png" alt="Chat Tensai Logo" style="max-width: 150px;">
+  </div>
+  
+  <h1 style="color: #2D3748; text-align: center;">Welcome to Chat Tensai!</h1>
+  
+  <p>Hello,</p>
+  
+  <p>Thank you for signing up for Chat Tensai. To complete your registration and start using our platform, please confirm your email address by clicking the button below:</p>
+  
+  <div style="text-align: center; margin: 30px 0;">
+    <a href="{{ .ConfirmationURL }}" style="background-color: #6F8FAF; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">Confirm Email Address</a>
+  </div>
+  
+  <p>If you didn't create an account with Chat Tensai, you can safely ignore this email.</p>
+  
+  <p>Best regards,<br>The Chat Tensai Team</p>
+  
+  <div style="margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; text-align: center;">
+    <p>If you're having trouble clicking the button, copy and paste this URL into your web browser:</p>
+    <p style="word-break: break-all;">{{ .ConfirmationURL }}</p>
+  </div>
+</body>
+</html> 

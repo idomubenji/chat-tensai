@@ -5,8 +5,7 @@
   "scripts": {
     "dev": "next dev --experimental-https",
     "build": "next build",
-    "start": "node server.js",
-    "start:next": "next start",
+    "start": "next start",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",

@@ -11,20 +11,31 @@ export function useChannels() {
   const supabase = createClientComponentClient<Database>();
 
   useEffect(() => {
+    let isMounted = true;
+
     const fetchChannels = async () => {
       try {
         setIsLoading(true);
+        setError(null);
+
         const { data, error } = await supabase
           .from('channels')
           .select('*')
           .order('created_at', { ascending: true });
 
         if (error) throw error;
-        setChannels(data || []);
+
+        if (isMounted) {
+          setChannels(data || []);
+          setIsLoading(false);
+        }
       } catch (err) {
-        setError(err as Error);
-      } finally {
-        setIsLoading(false);
+        console.error('Error fetching channels:', err);
+        if (isMounted) {
+          setError(err as Error);
+          setIsLoading(false);
+          setChannels([]); // Reset channels on error
+        }
       }
     };
 
@@ -39,12 +50,14 @@ export function useChannels() {
       .subscribe();
 
     return () => {
+      isMounted = false;
       subscription.unsubscribe();
     };
   }, [supabase]);
 
   const addChannel = async (name: string) => {
     try {
+      setError(null);
       const { data, error } = await supabase
         .from('channels')
         .insert([{ name }])
@@ -55,12 +68,14 @@ export function useChannels() {
       return data;
     } catch (err) {
       console.error('Error adding channel:', err);
+      setError(err as Error);
       throw err;
     }
   };
 
   const deleteChannel = async (channelId: string) => {
     try {
+      setError(null);
       const { error } = await supabase
         .from('channels')
         .delete()
@@ -69,6 +84,7 @@ export function useChannels() {
       if (error) throw error;
     } catch (err) {
       console.error('Error deleting channel:', err);
+      setError(err as Error);
       throw err;
     }
   };

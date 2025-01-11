@@ -23,6 +23,14 @@ export function ChannelList({ channels, isLoading }: ChannelListProps) {
     );
   }
 
+  if (!channels || channels.length === 0) {
+    return (
+      <div className="p-4 text-white">
+        No channels available
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-1">
       {channels.map((channel) => (
