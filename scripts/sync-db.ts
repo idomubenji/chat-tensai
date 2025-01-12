@@ -7,17 +7,10 @@ dotenv.config({ path: '.env.local.backup1' });
 
 async function main() {
   try {
-    console.log('🔄 Syncing database schema with production...');
-
-    // Pull the schema from production
-    console.log('📥 Pulling current schema from development...');
-    execSync(
-      'npx supabase db pull',
-      { stdio: 'inherit' }
-    );
+    console.log('🔄 Syncing database schema...');
 
     // Reset and apply migrations to local database
-    console.log('🔄 Applying schema to local database...');
+    console.log('🔄 Applying migrations to local database...');
     execSync('npx supabase db reset', { stdio: 'inherit' });
 
     console.log('✅ Database schema sync completed successfully!');
