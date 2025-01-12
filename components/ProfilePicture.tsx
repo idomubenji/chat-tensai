@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
 import useSWR from 'swr';
+import { defaultSWRConfig } from '@/lib/swr-config';
 
 interface ProfilePictureProps {
   size?: 'default' | 'large';
@@ -51,13 +52,7 @@ export function ProfilePicture({
   const { data: userData, error } = useSWR(
     shouldFetch ? USER_DATA_KEY : null,
     fetcher,
-    {
-      revalidateOnFocus: true,
-      revalidateOnReconnect: true,
-      refreshInterval: 30000,
-      dedupingInterval: 2000,
-      revalidateOnMount: true,
-    }
+    defaultSWRConfig
   );
 
   const finalAvatarUrl = avatarUrl || userData?.avatar_url || "/default-avatar.jpeg";

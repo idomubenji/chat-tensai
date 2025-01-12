@@ -1,7 +1,12 @@
 import { createClient } from '@supabase/supabase-js';
 import dotenv from 'dotenv';
 
-dotenv.config();
+// Load environment-specific .env file
+if (process.env.NODE_ENV === 'production') {
+  dotenv.config({ path: '.env.production' });
+} else {
+  dotenv.config({ path: '.env.local' });
+}
 
 const { NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY } = process.env;
 
@@ -14,6 +19,21 @@ if (!SUPABASE_SERVICE_ROLE_KEY) {
 }
 
 const supabase = createClient(NEXT_PUBLIC_SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+
+// Environment-specific configurations
+const CONFIG = {
+  production: {
+    fileSizeLimit: 5242880, // 5MB for production
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+  },
+  development: {
+    fileSizeLimit: 10485760, // 10MB for development
+    allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']
+  }
+};
+
+const env = process.env.NODE_ENV === 'production' ? 'production' : 'development';
+const config = CONFIG[env];
 
 async function setupStorage() {
   try {
@@ -34,8 +54,8 @@ async function setupStorage() {
         .storage
         .createBucket('avatars', {
           public: true,
-          fileSizeLimit: 5242880, // 5MB
-          allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+          fileSizeLimit: config.fileSizeLimit,
+          allowedMimeTypes: config.allowedMimeTypes
         });
 
       if (error) throw error;
@@ -49,8 +69,8 @@ async function setupStorage() {
       .storage
       .updateBucket('avatars', {
         public: true,
-        fileSizeLimit: 5242880, // 5MB
-        allowedMimeTypes: ['image/jpeg', 'image/png', 'image/gif', 'image/webp']
+        fileSizeLimit: config.fileSizeLimit,
+        allowedMimeTypes: config.allowedMimeTypes
       });
 
     if (updateError) throw updateError;

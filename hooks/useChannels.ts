@@ -58,8 +58,32 @@ export function useChannels() {
       if (userId) {
         const subscription = supabase
           .channel('channels')
-          .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
+          .on('postgres_changes', { 
+            event: '*', 
+            schema: 'public', 
+            table: 'channels' 
+          }, () => {
             fetchChannels();
+          })
+          .on('error', (error) => {
+            console.error('Realtime subscription error:', error);
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+              if (subscription.state === 'closed') {
+                console.log('Attempting to reconnect...');
+                subscription.subscribe();
+              }
+            }, 5000);
+          })
+          .on('disconnect', () => {
+            console.log('Realtime subscription disconnected');
+            // Attempt to reconnect after a delay
+            setTimeout(() => {
+              if (subscription.state === 'closed') {
+                console.log('Attempting to reconnect...');
+                subscription.subscribe();
+              }
+            }, 5000);
           })
           .subscribe();
 

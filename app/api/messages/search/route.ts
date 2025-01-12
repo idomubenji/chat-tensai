@@ -3,6 +3,7 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { z } from 'zod';
 import type { Database } from '@/types/supabase';
+import { rateLimit } from '@/lib/rate-limit';
 
 const searchQuerySchema = z.object({
   q: z.string().min(1).max(100),
@@ -12,19 +13,25 @@ const searchQuerySchema = z.object({
 
 export async function GET(request: Request) {
   try {
-    const { searchParams } = new URL(request.url);
-    const query = searchQuerySchema.parse({
-      q: searchParams.get('q'),
-      limit: Number(searchParams.get('limit')) || 20,
-      offset: Number(searchParams.get('offset')) || 0,
-    });
-
     const supabase = createRouteHandlerClient<Database>({ cookies });
     const { data: { session } } = await supabase.auth.getSession();
 
     if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
+    // Apply rate limiting
+    const { limited, response } = rateLimit(session.user.id);
+    if (limited) {
+      return response;
+    }
+
+    const { searchParams } = new URL(request.url);
+    const query = searchQuerySchema.parse({
+      q: searchParams.get('q'),
+      limit: Number(searchParams.get('limit')) || 20,
+      offset: Number(searchParams.get('offset')) || 0,
+    });
 
     const { data: messages, error } = await supabase
       .from('messages')

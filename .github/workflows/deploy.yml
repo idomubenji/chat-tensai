@@ -56,6 +56,19 @@ jobs:
           PORT=3000
           EOL
 
+      - name: Sync Database Schema
+        run: |
+          echo "Creating local env file for database sync..."
+          cat > .env.local << EOL
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.DEVELOPMENT_SUPABASE_SERVICE_ROLE_KEY }}
+          EOL
+          
+          echo "Running database sync..."
+          chmod +x scripts/sync-production-db.sh
+          ./scripts/sync-production-db.sh
+
       - name: Deploy to EC2
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
