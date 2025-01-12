@@ -25,7 +25,7 @@ cp -r supabase deploy/
 echo "Copying configuration files..."
 cp package.json deploy/
 cp package-lock.json deploy/
-cp .env.production deploy/
+cp .env.production deploy/.env
 cp next.config.mjs deploy/
 cp tsconfig.json deploy/
 cp server.js deploy/
@@ -56,6 +56,12 @@ trap 'error_handler ${LINENO} $?' ERR
 
 echo "Setting up production environment..."
 export NODE_ENV=production
+
+# Load environment variables
+echo "Loading environment variables..."
+set -a
+source .env
+set +a
 
 echo "Creating log directory..."
 mkdir -p logs
