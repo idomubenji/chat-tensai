@@ -33,6 +33,7 @@ jobs:
       
       - name: Create env file
         run: |
+          echo "Creating environment files..."
           cat > .env.production << EOL
           NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
           NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
@@ -47,12 +48,11 @@ jobs:
           NEXT_DISABLE_TYPE_CHECKS=1
           EOL
           
-          # Also create .env for build time
+          echo "Copying to .env..."
           cp .env.production .env
           
-          # Debug: verify env file contents (excluding sensitive data)
-          echo "Verifying environment variables in .env:"
-          cat .env | grep -v '_KEY' | grep -v '_SECRET'
+          echo "Verifying environment files exist..."
+          ls -la .env*
       
       - name: Check for database changes
         id: check_db
@@ -106,30 +106,25 @@ jobs:
         run: |
           echo "Checking environment variables..."
           
-          echo "Direct secret check:"
-          if [ -n "${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}" ]; then
-            echo "Secret NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY exists"
-          else
-            echo "Secret NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY is missing"
-          fi
+          # Check all required Supabase variables
+          for var in "NEXT_PUBLIC_SUPABASE_URL" "NEXT_PUBLIC_SUPABASE_ANON_KEY" "SUPABASE_SERVICE_ROLE_KEY"; do
+            echo "Checking $var..."
+            if [ -n "${!var}" ]; then
+              echo "✓ $var exists (length: ${#var})"
+            else
+              echo "✗ $var is missing"
+              exit 1
+            fi
+          done
           
-          echo "Environment variable check:"
-          if [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "Env var NEXT_PUBLIC_SUPABASE_ANON_KEY exists (length: ${#NEXT_PUBLIC_SUPABASE_ANON_KEY})"
-          else
-            echo "Env var NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
-          fi
-          
-          # Verify required variables are set
-          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
-            echo "Error: NEXT_PUBLIC_SUPABASE_URL is not set"
-            exit 1
-          fi
-          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "Error: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set"
-            exit 1
-          fi
           echo "Environment variables verified successfully"
+          
+          # Debug: Print non-sensitive parts of env files
+          echo "Contents of .env (excluding sensitive data):"
+          cat .env | grep -v '_KEY' | grep -v '_SECRET'
+          
+          echo "Contents of .env.production (excluding sensitive data):"
+          cat .env.production | grep -v '_KEY' | grep -v '_SECRET'
       
       - name: Build application
         run: |
