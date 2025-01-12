@@ -64,17 +64,20 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '18'
+          node-version: '18.17.0'
           cache: 'npm'
       
       - name: Install dependencies
         run: |
-          echo "Installing all dependencies..."
-          npm ci
+          echo "Installing dependencies..."
+          rm -rf node_modules
+          rm -rf .next
+          npm install
           
-          echo "Verifying node_modules..."
+          echo "Verifying critical dependencies..."
           ls -la node_modules/.bin/eslint || echo "eslint not found"
           ls -la node_modules/.bin/tsc || echo "typescript not found"
+          ls -la node_modules/dotenv || echo "dotenv not found"
           
           echo "Installation complete!"
 
