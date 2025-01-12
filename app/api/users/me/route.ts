@@ -47,9 +47,11 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const body = await req.json();
@@ -57,20 +59,8 @@ export async function PATCH(req: Request) {
 
     // Validate status message length
     if (status_message && status_message.length > 25) {
-      return NextResponse.json({ error: 'Status message must be 25 characters or less' }, { status: 400 });
+      return new NextResponse('Status message must be 25 characters or less', { status: 400 });
     }
-
-    console.log('=== Attempting to update user profile ===:', {
-      userId,
-      bio,
-      status_message,
-      status_emoji,
-      avatar_url,
-      name
-    });
-
-    // Initialize Supabase client
-    const supabase = createRouteHandlerClient<Database>({ cookies });
 
     // Update user profile
     const { data: user, error: updateError } = await supabase
@@ -83,43 +73,36 @@ export async function PATCH(req: Request) {
         name,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId)
+      .eq('id', session.user.id)
       .select()
       .single();
 
     if (updateError) {
-      console.error('=== Error updating user profile ===:', {
-        error: updateError,
-        userId,
-        code: updateError.code,
-        message: updateError.message
-      });
-      return NextResponse.json({ error: 'Failed to update profile' }, { status: 500 });
+      console.error('Error updating user profile:', updateError);
+      return new NextResponse('Failed to update profile', { status: 500 });
     }
 
-    console.log('=== Successfully updated user profile ===:', user);
     return NextResponse.json(user);
   } catch (error) {
-    console.error('=== Error updating user profile ===:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error updating user profile:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
 export async function DELETE() {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
-    }
-
-    // Initialize Supabase client
     const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
+    }
 
     // First, delete all user's messages
     const { error: messagesError } = await supabase
       .from('messages')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', session.user.id);
 
     if (messagesError) throw messagesError;
 
@@ -127,7 +110,7 @@ export async function DELETE() {
     const { error: userError } = await supabase
       .from('users')
       .delete()
-      .eq('id', userId);
+      .eq('id', session.user.id);
 
     if (userError) throw userError;
 
@@ -136,8 +119,8 @@ export async function DELETE() {
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {
-    console.error('=== Error deleting user ===:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error deleting user:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
