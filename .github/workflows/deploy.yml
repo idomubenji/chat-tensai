@@ -95,7 +95,9 @@ jobs:
           supabase start
           echo "Using production environment for database sync..."
           echo "Running database sync with production environment..."
-          NODE_ENV=production npx ts-node scripts/sync-db.ts
+          # Ensure environment is loaded and run with proper Node setup
+          source .env.production
+          NODE_ENV=production NODE_OPTIONS="--require dotenv/config" npx ts-node scripts/sync-db.ts
       
       - name: Verify environment setup
         run: |
