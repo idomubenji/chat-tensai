@@ -65,13 +65,22 @@ jobs:
       
       - name: Install dependencies
         run: |
+          echo "Installing production dependencies..."
           if [ -e package-lock.json ]; then
-            npm ci
+            npm ci --production
           else
-            npm install
+            npm install --production
           fi
-          npm install --save-dev typescript@latest @types/node@latest eslint@latest dotenv@latest @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest
-      
+          
+          echo "Installing development dependencies..."
+          npm install --save-dev typescript@latest @types/node@latest eslint@latest @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest dotenv@latest
+          
+          echo "Verifying critical dependencies..."
+          npm list eslint && \
+          npm list dotenv && \
+          npm list typescript && \
+          echo "All critical dependencies are installed!"
+
       - name: Setup Supabase CLI
         if: steps.check_db.outputs.has_db_changes == 'true'
         uses: supabase/setup-cli@v1
