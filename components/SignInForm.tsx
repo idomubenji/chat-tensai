@@ -8,12 +8,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { handleUserOnboarding } from '@/lib/user-onboarding';
-import { FcGoogle } from 'react-icons/fc';
 
 export function SignInForm() {
   const [emailOrUsername, setEmailOrUsername] = useState('');
   const [password, setPassword] = useState('');
-  const { signIn, signInWithGoogle, loading, error } = useSignIn();
+  const { signIn, loading, error } = useSignIn();
   const router = useRouter();
   const supabase = createClientComponentClient();
 
@@ -83,26 +82,6 @@ export function SignInForm() {
           {loading ? 'Signing in...' : 'Sign in'}
         </Button>
       </form>
-
-      <div className="relative">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-300" />
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-white text-gray-500">Or continue with</span>
-        </div>
-      </div>
-
-      <Button
-        type="button"
-        variant="outline"
-        className="w-full"
-        onClick={() => signInWithGoogle()}
-        disabled={loading}
-      >
-        <FcGoogle className="h-5 w-5 mr-2" />
-        Sign in with Google
-      </Button>
     </div>
   );
 } 

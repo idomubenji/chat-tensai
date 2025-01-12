@@ -14,7 +14,9 @@ export function useSignIn() {
       setLoading(true);
       setError(null);
 
-      // First, try to find a user with this username
+      let emailToUse = emailOrUsername;
+
+      // If input doesn't look like an email, treat it as a username
       if (!emailOrUsername.includes('@')) {
         const { data: userData, error: userError } = await supabase
           .from('users')
@@ -22,18 +24,33 @@ export function useSignIn() {
           .eq('name', emailOrUsername)
           .single();
 
-        if (!userError && userData) {
-          emailOrUsername = userData.email;
+        if (userError) {
+          if (userError.code === 'PGRST116') {
+            throw new Error('No user found with this username');
+          }
+          throw userError;
         }
+
+        if (!userData?.email) {
+          throw new Error('No email associated with this username');
+        }
+
+        emailToUse = userData.email;
       }
 
       // Sign in with email and password
       const { data, error: signInError } = await supabase.auth.signInWithPassword({
-        email: emailOrUsername,
+        email: emailToUse,
         password,
       });
 
-      if (signInError) throw signInError;
+      if (signInError) {
+        // Customize error message based on the error code
+        if (signInError.message === 'Invalid login credentials') {
+          throw new Error('Incorrect email/username or password');
+        }
+        throw signInError;
+      }
 
       return { success: true, data };
     } catch (err) {
@@ -45,29 +62,5 @@ export function useSignIn() {
     }
   };
 
-  const signInWithGoogle = async () => {
-    try {
-      setLoading(true);
-      setError(null);
-
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'google',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
-        },
-      });
-
-      if (error) throw error;
-
-      return { success: true, data };
-    } catch (err) {
-      console.error('Error in signInWithGoogle:', err);
-      setError(err instanceof Error ? err.message : 'Failed to sign in with Google');
-      return { success: false, error: err instanceof Error ? err.message : 'Failed to sign in with Google' };
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return { signIn, signInWithGoogle, loading, error };
+  return { signIn, loading, error };
 } 
