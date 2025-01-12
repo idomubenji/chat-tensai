@@ -1,17 +1,19 @@
-import { createSupabaseAdminClient } from '@/lib/supabase';
-import { getAuthUserId } from '@/lib/auth';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
+import type { Database } from '@/types/supabase';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    // Check if user is authenticated
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    // Use admin client to fetch channels
-    const supabase = createSupabaseAdminClient();
     const { data: channels, error } = await supabase
       .from('channels')
       .select('*')
@@ -27,6 +29,4 @@ export async function GET() {
     console.error('Error in channels route:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
-}
-
-export const dynamic = 'force-dynamic'; 
+} 

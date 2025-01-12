@@ -2,37 +2,46 @@ import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
 import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
-import { getAuthUserId } from '@/lib/auth';
+
+export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
+      return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    console.log('=== Fetching user profile ===', { userId });
-
-    // Initialize Supabase client
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-
-    // Get user profile with all fields
-    const { data: user, error: userError } = await supabase
+    const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', userId)
+      .eq('id', session.user.id)
       .single();
 
-    if (userError) {
-      console.error('=== Error fetching user profile ===:', userError);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    if (error) {
+      console.error('Error fetching user:', error);
+      return new NextResponse('Error fetching user data', { status: 500 });
     }
 
-    console.log('=== User profile fetched successfully ===:', user);
-    return NextResponse.json(user);
+    if (!user) {
+      return new NextResponse('User not found', { status: 404 });
+    }
+
+    return NextResponse.json({
+      id: user.id,
+      email: user.email,
+      name: user.name,
+      avatar_url: user.avatar_url,
+      status: user.status,
+      last_seen_at: user.last_seen_at,
+      created_at: user.created_at,
+      updated_at: user.updated_at
+    });
   } catch (error) {
-    console.error('=== Error fetching user profile ===:', error);
-    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+    console.error('Error in /api/users/me:', error);
+    return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 

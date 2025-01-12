@@ -6,8 +6,27 @@ export async function middleware(req: NextRequest) {
   const res = NextResponse.next();
   const supabase = createMiddlewareClient({ req, res });
 
-  // Refresh session if expired - required for Server Components
-  await supabase.auth.getSession();
+  // Refresh session if expired
+  const { data: { session }, error } = await supabase.auth.getSession();
+
+  // Handle auth errors
+  if (error) {
+    console.error('Middleware auth error:', error);
+    return NextResponse.redirect(new URL('/sign-in', req.url));
+  }
+
+  // Protect API routes
+  if (req.nextUrl.pathname.startsWith('/api/')) {
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+  }
+
+  // Protect authenticated pages
+  const publicPaths = ['/sign-in', '/sign-up'];
+  if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL('/sign-in', req.url));
+  }
 
   return res;
 }
