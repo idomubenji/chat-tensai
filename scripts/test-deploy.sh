@@ -1,37 +1,56 @@
 #!/bin/bash
 set -e
 
-echo "Creating test deployment directory..."
-rm -rf ~/test-deploy
-mkdir -p ~/test-deploy
+echo "🧪 Testing deployment process locally..."
 
-echo "Building the application..."
-NODE_ENV=production npm run build
+# Create test directory
+TEST_DIR="deploy-test"
+echo "📁 Creating test directory: $TEST_DIR"
+rm -rf $TEST_DIR
+mkdir -p $TEST_DIR
 
-echo "Creating deployment package..."
-tar -czf deploy.tar.gz \
-  .next/standalone \
-  .next/static \
-  public \
-  ecosystem.config.js \
-  .env.production
+# Run prepare-deploy to create the package
+echo "📦 Running prepare-deploy..."
+./scripts/prepare-deploy.sh
 
-echo "Extracting deployment package..."
-tar -xzf deploy.tar.gz -C ~/test-deploy
+# Extract the package in test directory
+echo "📂 Extracting deployment package..."
+tar -xzf deploy.tar.gz -C $TEST_DIR
 
-echo "Setting up static files..."
-cd ~/test-deploy
+# Create necessary directories (from nginx-deployment-fix.md)
+echo "📁 Creating required directories..."
+cd $TEST_DIR
 mkdir -p .next/standalone/.next/static
-cp -r .next/static/* .next/standalone/.next/static/
-cp -r public/* .next/standalone/public/
-cp .env.production .next/standalone/
-cp ecosystem.config.js .next/standalone/
+mkdir -p .next/standalone/public
 
-echo "Starting application with PM2..."
-pm2 delete chat-genius-test 2>/dev/null || true
-cd .next/standalone
-NODE_ENV=production PORT=3001 pm2 start server.js --name "chat-genius-test"
+# Test the build process
+echo "🏗️ Testing build process..."
+export NODE_ENV=production
+npm install --omit=dev --verbose
+npm install --save-dev typescript@latest @types/node@latest eslint@latest @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest --verbose
 
-echo "Test deployment complete! App should be running on http://localhost:3001"
-echo "Check logs with: pm2 logs chat-genius-test"
-echo "Stop test deployment with: pm2 delete chat-genius-test" 
+echo "🔨 Building application..."
+NODE_OPTIONS="--max-old-space-size=4096" npm run build
+
+# Test cleanup of .next directory
+echo "🧹 Testing .next cleanup..."
+if [ -d ".next/standalone/.next/cache" ]; then
+  echo "Testing removal of .next cache..."
+  sudo rm -rf .next/standalone/.next/cache
+  if [ $? -ne 0 ]; then
+    echo "❌ Warning: Permission issues detected with .next cache cleanup"
+    echo "This might cause issues in production"
+    exit 1
+  fi
+fi
+
+echo "✅ Deployment test completed successfully!"
+echo "You can inspect the test deployment in the '$TEST_DIR' directory"
+
+# Cleanup
+cd ..
+echo "🧹 Cleaning up..."
+rm -rf $TEST_DIR
+rm -f deploy.tar.gz
+
+echo "✨ All done! If no errors occurred, the deployment should work in production." 

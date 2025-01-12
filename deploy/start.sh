@@ -30,6 +30,15 @@ npm prune --production
 echo "Starting application with PM2..."
 pm2 delete chat-genius 2>/dev/null || true
 
+# Clean up any existing .next cache with sudo
+echo "Cleaning up .next cache..."
+if [ -d ".next" ]; then
+  sudo rm -rf .next
+fi
+
+echo "Ensuring general channel exists..."
+NODE_ENV=production npx ts-node scripts/ensure-general-channel.ts
+
 echo "Starting server..."
 pm2 start ecosystem.config.js --env production
 

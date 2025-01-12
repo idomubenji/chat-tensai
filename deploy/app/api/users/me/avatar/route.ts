@@ -6,37 +6,49 @@ import { S3Client, PutObjectCommand, GetObjectCommand } from '@aws-sdk/client-s3
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import type { Database } from '@/types/supabase';
 import { getAuthSession } from '@/lib/auth';
+import { getSupabaseAdmin } from '@/lib/supabase';
 
-// Initialize S3 client
-const s3 = new S3Client({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  }
-});
-
-// Validate environment variables
-if (!process.env.AWS_REGION || !process.env.AWS_ACCESS_KEY_ID || !process.env.AWS_SECRET_ACCESS_KEY || !process.env.AWS_BUCKET_NAME) {
-  throw new Error('Missing required AWS environment variables');
-}
-
-if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SERVICE_ROLE_KEY) {
-  throw new Error('Missing required Supabase environment variables');
-}
-
-// Initialize Supabase admin client
-const supabaseAdmin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-);
-
-const BUCKET_NAME = process.env.AWS_BUCKET_NAME;
 const AVATAR_PREFIX = 'avatars/';
 const URL_EXPIRATION = 604800;
 
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
+  }
+  return value;
+}
+
+function validateEnvironment() {
+  // This will throw if any required variable is missing
+  const requiredVars = [
+    'AWS_REGION',
+    'AWS_ACCESS_KEY_ID',
+    'AWS_SECRET_ACCESS_KEY',
+    'AWS_BUCKET_NAME',
+    'NEXT_PUBLIC_SUPABASE_URL',
+    'SUPABASE_SERVICE_ROLE_KEY'
+  ];
+  
+  requiredVars.forEach(getRequiredEnvVar);
+}
+
+function getS3Client() {
+  return new S3Client({
+    region: getRequiredEnvVar('AWS_REGION'),
+    credentials: {
+      accessKeyId: getRequiredEnvVar('AWS_ACCESS_KEY_ID'),
+      secretAccessKey: getRequiredEnvVar('AWS_SECRET_ACCESS_KEY'),
+    }
+  });
+}
+
 export async function POST(req: Request) {
   try {
+    validateEnvironment();
+    const s3 = getS3Client();
+    const supabase = getSupabaseAdmin();
+    
     // 1. Auth check
     const session = await getAuthSession();
     if (!session?.user?.id) {
@@ -52,7 +64,7 @@ export async function POST(req: Request) {
     });
 
     // Let's check what users exist in Supabase
-    const { data: allUsers, error: listError } = await supabaseAdmin
+    const { data: allUsers, error: listError } = await supabase
       .from('users')
       .select('id, email')
       .limit(5);
@@ -71,7 +83,7 @@ export async function POST(req: Request) {
     }
 
     // Try to find the user directly
-    const { data: user, error: findError } = await supabaseAdmin
+    const { data: user, error: findError } = await supabase
       .from('users')
       .select('*')
       .eq('id', userId)
@@ -87,7 +99,7 @@ export async function POST(req: Request) {
     if (!user) {
       console.log('=== AVATAR UPLOAD: USER NOT FOUND ===\n');
       // Try to create the user
-      const { data: newUser, error: createError } = await supabaseAdmin
+      const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
           id: userId,
@@ -133,14 +145,14 @@ export async function POST(req: Request) {
     // 4. Upload to S3
     try {
       const putCommand = new PutObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: process.env.AWS_BUCKET_NAME,
         Key: fileName,
         Body: buffer,
         ContentType: file.type,
       });
 
       console.log('Attempting S3 upload with:', {
-        bucket: BUCKET_NAME,
+        bucket: process.env.AWS_BUCKET_NAME,
         key: fileName,
         contentType: file.type,
         region: process.env.AWS_REGION,
@@ -152,14 +164,14 @@ export async function POST(req: Request) {
 
       // Generate a signed URL for the uploaded file
       const getCommand = new GetObjectCommand({
-        Bucket: BUCKET_NAME,
+        Bucket: process.env.AWS_BUCKET_NAME,
         Key: fileName,
       });
 
       const signedUrl = await getSignedUrl(s3, getCommand, { expiresIn: URL_EXPIRATION });
 
       // Update user's avatar URL in Supabase
-      const { error: updateError } = await supabaseAdmin
+      const { error: updateError } = await supabase
         .from('users')
         .update({ avatar_url: signedUrl })
         .eq('id', userId);
@@ -176,7 +188,7 @@ export async function POST(req: Request) {
         error: s3Error,
         errorName: s3Error.name,
         errorMessage: s3Error.message,
-        bucket: BUCKET_NAME,
+        bucket: process.env.AWS_BUCKET_NAME,
         region: process.env.AWS_REGION
       });
       return new NextResponse(`Failed to upload file to S3: ${s3Error.message}`, { status: 500 });
@@ -189,6 +201,9 @@ export async function POST(req: Request) {
 
 export async function DELETE() {
   try {
+    validateEnvironment();
+    const supabase = getSupabaseAdmin();
+    
     const session = await getAuthSession();
     if (!session?.user?.id) {
       return new NextResponse('Unauthorized', { status: 401 });
@@ -196,7 +211,7 @@ export async function DELETE() {
     const userId = session.user.id;
 
     // Update user in database to use default avatar
-    const { data, error } = await supabaseAdmin
+    const { data, error } = await supabase
       .from('users')
       .update({
         avatar_url: '/default-avatar.jpeg',

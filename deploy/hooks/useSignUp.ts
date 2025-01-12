@@ -23,21 +23,15 @@ export function useSignUp() {
           data: {
             username,
           },
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       });
 
       if (authError) throw authError;
 
-      // Handle user onboarding if sign up was successful
-      if (authData.user) {
-        const { success, error: onboardingError } = await handleUserOnboarding(
-          authData.user.id,
-          email,
-          username
-        );
-
-        if (!success) throw onboardingError;
-      }
+      // Don't handle onboarding here - wait for email confirmation
+      // The user will be redirected to /auth/callback after confirming email
+      // which will then handle the onboarding process
 
       return { success: true };
     } catch (err) {

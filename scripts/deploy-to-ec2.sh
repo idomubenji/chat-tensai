@@ -19,10 +19,25 @@ scp -i $SSH_KEY deploy.tar.gz $EC2_USER@$EC2_HOST:~
 echo "🔧 Deploying on EC2..."
 ssh -i $SSH_KEY $EC2_USER@$EC2_HOST << 'ENDSSH'
 cd ~
-rm -rf chat-genius
+
+# Stop the existing application
+echo "Stopping existing application..."
+pm2 delete chat-genius 2>/dev/null || true
+
+# Clean up old deployment with proper permissions
+echo "Cleaning up old deployment..."
+if [ -d "chat-genius" ]; then
+  sudo rm -rf chat-genius
+fi
+
 mkdir chat-genius
 cd chat-genius
 tar -xzf ../deploy.tar.gz
+
+# Ensure proper ownership of all files
+sudo chown -R $USER:$USER .
+
+# Start the application
 ./start.sh
 ENDSSH
 

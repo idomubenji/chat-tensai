@@ -1,27 +1,19 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '@/types/supabase';
 
-// URLs and keys based on environment
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabaseServiceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-
-// Create clients
-export const supabase = createClient<Database>(supabaseUrl, supabaseAnonKey);
-
-export const supabaseAdmin = createClient<Database>(
-  supabaseUrl,
-  supabaseServiceRoleKey,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
+function getRequiredEnvVar(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`Missing required environment variable: ${name}`);
   }
-);
+  return value;
+}
 
-// Helper to create a client with custom headers (for Clerk auth)
-export const createSupabaseClient = (headers?: Record<string, string>) => {
+// Create clients only when needed
+export function getSupabaseClient(headers?: Record<string, string>) {
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseAnonKey = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY');
+  
   return createClient<Database>(supabaseUrl, supabaseAnonKey, {
     global: {
       headers: headers || {},
@@ -30,14 +22,26 @@ export const createSupabaseClient = (headers?: Record<string, string>) => {
       persistSession: false,
     },
   });
-};
+}
 
-// Helper to create an admin client (for server-side operations)
-export const createSupabaseAdminClient = () => {
-  return createClient<Database>(supabaseUrl, supabaseServiceRoleKey, {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false,
-    },
-  });
-}; 
+export function getSupabaseAdmin() {
+  const supabaseUrl = getRequiredEnvVar('NEXT_PUBLIC_SUPABASE_URL');
+  const supabaseServiceRoleKey = getRequiredEnvVar('SUPABASE_SERVICE_ROLE_KEY');
+  
+  return createClient<Database>(
+    supabaseUrl,
+    supabaseServiceRoleKey,
+    {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    }
+  );
+}
+
+// Backwards compatibility for existing code
+export const supabase = getSupabaseClient();
+export const supabaseAdmin = getSupabaseAdmin();
+export const createSupabaseClient = getSupabaseClient;
+export const createSupabaseAdminClient = getSupabaseAdmin; 
