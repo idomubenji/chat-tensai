@@ -15,6 +15,12 @@ export function useSignUp() {
       setLoading(true);
       setError(null);
 
+      // Validate email domain
+      if (!email.toLowerCase().endsWith('@gauntletai.com')) {
+        setError('Only @gauntletai.com email addresses are allowed');
+        return { success: false, error: 'Only @gauntletai.com email addresses are allowed' };
+      }
+
       // Sign up the user
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,

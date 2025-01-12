@@ -87,9 +87,10 @@ export function SignUpForm() {
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            placeholder="Your email address"
+            placeholder="Enter your email"
             required
           />
+          <p className="text-sm text-gray-500">Only @gauntletai.com email addresses are allowed</p>
         </div>
         <div className="space-y-2">
           <Label htmlFor="password">Password</Label>
