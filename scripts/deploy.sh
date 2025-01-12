@@ -24,6 +24,8 @@ rsync -av --progress \
     package-lock.json \
     .env.production \
     next.config.js \
+    ecosystem.config.js \
+    scripts \
     public \
     ec2-user@44.200.83.77:~/chat-genius/
 
@@ -47,7 +49,7 @@ ssh -i ~/.ssh/chat-genius-ec2.pem ec2-user@44.200.83.77 'bash -s' << 'ENDSSH'
     
     # Start the application with PM2
     pm2 delete chat-genius 2>/dev/null || true
-    pm2 start npm --name "chat-genius" -- start
+    pm2 start ecosystem.config.js
     
     # Save PM2 process list and configure to start on reboot
     pm2 save

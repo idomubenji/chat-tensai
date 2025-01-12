@@ -84,6 +84,7 @@ export function Sidebar() {
             borderColor="black"
             borderWidth="thin"
             size="default"
+            avatarUrl={userData?.avatar_url || null}
           />
         </button>
         <SignOutButton />

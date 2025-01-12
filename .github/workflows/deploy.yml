@@ -154,8 +154,8 @@ jobs:
         env:
           SSH_AUTH_SOCK: /tmp/ssh_agent.sock
         run: |
-          # Copy setup script first
-          scp -o ConnectTimeout=30 scripts/setup-nginx.sh ec2-user@${{ secrets.EC2_HOST }}:~
+          # Copy setup script and server scripts first
+          scp -o ConnectTimeout=30 scripts/setup-nginx.sh scripts/server.js ec2-user@${{ secrets.EC2_HOST }}:~
           
           # Create deployment package
           tar -czf deploy.tar.gz \
@@ -163,7 +163,8 @@ jobs:
             .next/static \
             public \
             .env.production \
-            ecosystem.config.js
+            ecosystem.config.js \
+            scripts/server.js
 
           # Copy deployment package
           scp -o ConnectTimeout=30 deploy.tar.gz ec2-user@${{ secrets.EC2_HOST }}:~
@@ -183,7 +184,6 @@ jobs:
             sudo pm2 stop chat-genius 2>/dev/null || true
             
             echo "Cleaning up old deployment..."
-            # Use sudo to handle permission issues
             if [ -d "~/chat-genius" ]; then
               sudo rm -rf ~/chat-genius
             fi
@@ -193,14 +193,16 @@ jobs:
             tar -xzf deploy.tar.gz -C ~/chat-genius
             cd ~/chat-genius
             
-            echo "Setting up static files..."
+            echo "Setting up directory structure..."
             mkdir -p .next/standalone/.next/static
             mkdir -p .next/standalone/public
+            mkdir -p .next/standalone/scripts
             
-            # Copy static files with verbose output for debugging
-            echo "Copying static files..."
+            # Copy files with verbose output for debugging
+            echo "Copying files..."
             cp -rv .next/static/* .next/standalone/.next/static/
             cp -rv public/* .next/standalone/public/
+            cp -rv scripts/* .next/standalone/scripts/
             
             echo "Copying configuration files..."
             cp -v .env.production .next/standalone/
@@ -212,7 +214,7 @@ jobs:
             
             echo "Starting application..."
             cd .next/standalone
-            sudo -E NODE_ENV=production pm2 start server.js --name "chat-genius" && sudo pm2 save
+            sudo -E NODE_ENV=production pm2 start ecosystem.config.js --env production && sudo pm2 save
             
             echo "Restarting Nginx..."
             sudo systemctl restart nginx

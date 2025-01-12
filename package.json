@@ -6,6 +6,8 @@
     "dev": "next dev --experimental-https",
     "build": "next build",
     "start": "next start",
+    "start:prod": "NODE_ENV=production node scripts/server.js",
+    "deploy:prod": "bash scripts/production-start.sh",
     "lint": "next lint",
     "test": "jest",
     "test:watch": "jest --watch",
@@ -25,7 +27,10 @@
     "db:pull": "supabase db pull",
     "db:diff": "supabase db diff",
     "db:lint": "supabase db lint",
-    "create-system-users": "ts-node scripts/create-system-users.ts"
+    "create-system-users": "ts-node scripts/create-system-users.ts",
+    "env:check": "ts-node scripts/check-env.ts",
+    "test:components": "ts-node scripts/test-components.ts",
+    "test:components:prod": "NODE_ENV=production ts-node scripts/test-components.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.723.0",
