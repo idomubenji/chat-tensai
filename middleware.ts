@@ -3,43 +3,73 @@ import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 
 export async function middleware(req: NextRequest) {
-  const res = NextResponse.next();
-  const supabase = createMiddlewareClient({ req, res });
+  try {
+    // Create response first
+    const res = NextResponse.next();
+    
+    // Create Supabase client
+    const supabase = createMiddlewareClient({ req, res });
 
-  // Refresh session if expired
-  const { data: { session }, error } = await supabase.auth.getSession();
+    // Add debug logging for all requests
+    console.log('[Middleware] Request:', {
+      url: req.url,
+      path: req.nextUrl.pathname,
+      cookies: req.cookies.getAll().map(c => c.name)
+    });
 
-  // Handle auth errors
-  if (error) {
-    console.error('Middleware auth error:', error);
-    return NextResponse.redirect(new URL('/sign-in', req.url));
-  }
+    // Refresh session and await it specifically
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    console.log('[Middleware] Session state:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      error: sessionError ? { message: sessionError.message } : null
+    });
 
-  // Protect API routes
-  if (req.nextUrl.pathname.startsWith('/api/')) {
-    if (!session) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    if (sessionError) {
+      console.error('[Middleware] Session error:', sessionError);
+      if (req.nextUrl.pathname.startsWith('/api/')) {
+        return NextResponse.json({ error: 'Auth error' }, { status: 401 });
+      }
+      return NextResponse.redirect(new URL('/sign-in', req.url));
     }
-  }
 
-  // Protect authenticated pages
-  const publicPaths = ['/sign-in', '/sign-up'];
-  if (!session && !publicPaths.includes(req.nextUrl.pathname)) {
+    // Protect API routes
+    if (req.nextUrl.pathname.startsWith('/api/')) {
+      if (!session) {
+        console.log('[Middleware] No session for API route');
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      }
+      console.log('[Middleware] Session found for API route:', {
+        userId: session.user.id,
+        hasToken: !!session.access_token
+      });
+    }
+
+    // Protect authenticated pages
+    const publicPaths = ['/sign-in', '/sign-up', '/auth/callback'];
+    if (!publicPaths.includes(req.nextUrl.pathname)) {
+      if (!session) {
+        console.log('[Middleware] No session for protected route');
+        return NextResponse.redirect(new URL('/sign-in', req.url));
+      }
+    }
+
+    return res;
+  } catch (error) {
+    console.error('[Middleware] Error:', error);
     return NextResponse.redirect(new URL('/sign-in', req.url));
   }
-
-  return res;
 }
 
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public folder
-     */
-    '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    // Match API routes
+    '/api/:path*',
+    // Match auth callback
+    '/auth/callback',
+    // Match all authenticated pages
+    '/((?!_next/static|_next/image|favicon.ico|sign-in|sign-up|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

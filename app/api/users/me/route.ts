@@ -14,16 +14,29 @@ export async function GET() {
     const { data: { session }, error: sessionError } = await supabase.auth.getSession();
     
     if (sessionError) {
-      console.error('[/api/users/me] Session error:', sessionError);
+      console.error('[/api/users/me] Session error:', {
+        error: sessionError,
+        message: sessionError.message,
+        status: sessionError.status,
+        name: sessionError.name
+      });
       return new NextResponse('Authentication error', { status: 401 });
     }
 
     if (!session?.user) {
-      console.error('[/api/users/me] No session found');
+      console.error('[/api/users/me] No session found', {
+        hasSession: !!session,
+        cookies: cookies().getAll().map(c => ({ name: c.name }))
+      });
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    console.log('[/api/users/me] Session found, fetching user data');
+    console.log('[/api/users/me] Session found, fetching user data', {
+      userId: session.user.id,
+      userEmail: session.user.email,
+      accessToken: session.access_token ? 'present' : 'missing'
+    });
+    
     const { data: user, error } = await supabase
       .from('users')
       .select('*')

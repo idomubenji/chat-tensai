@@ -5,7 +5,7 @@ const nextConfig = {
     remotePatterns: [
       {
         protocol: 'https',
-        hostname: 'chat-tensai.s3.us-east-1.amazonaws.com',
+        hostname: 'tensai-bucket.s3.us-east-1.amazonaws.com',
         port: '',
         pathname: '/avatars/**',
       },

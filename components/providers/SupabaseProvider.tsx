@@ -48,7 +48,10 @@ export function SupabaseProvider({
         
         console.log('[SupabaseProvider] Session state:', {
           hasSession: !!session,
-          hasUser: !!session?.user
+          hasUser: !!session?.user,
+          userId: session?.user?.id,
+          userEmail: session?.user?.email,
+          accessToken: session?.access_token ? 'present' : 'missing'
         });
         
         setUser(session?.user ?? null);
@@ -56,7 +59,12 @@ export function SupabaseProvider({
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
-          console.log('[SupabaseProvider] Auth state changed:', { event });
+          console.log('[SupabaseProvider] Auth state changed:', { 
+            event,
+            hasSession: !!session,
+            hasUser: !!session?.user,
+            userId: session?.user?.id
+          });
           setUser(session?.user ?? null);
           
           if (event === 'SIGNED_OUT') {
