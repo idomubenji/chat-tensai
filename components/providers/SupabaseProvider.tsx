@@ -34,12 +34,29 @@ export function SupabaseProvider({
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const { data: { session } } = await supabase.auth.getSession();
+        console.log('[SupabaseProvider] Initializing auth...');
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+        
+        if (sessionError) {
+          console.error('[SupabaseProvider] Session error:', {
+            error: sessionError,
+            message: sessionError.message,
+            status: sessionError.status
+          });
+          throw sessionError;
+        }
+        
+        console.log('[SupabaseProvider] Session state:', {
+          hasSession: !!session,
+          hasUser: !!session?.user
+        });
+        
         setUser(session?.user ?? null);
         
         const {
           data: { subscription },
         } = supabase.auth.onAuthStateChange(async (event, session) => {
+          console.log('[SupabaseProvider] Auth state changed:', { event });
           setUser(session?.user ?? null);
           
           if (event === 'SIGNED_OUT') {
@@ -53,6 +70,11 @@ export function SupabaseProvider({
           subscription.unsubscribe();
         };
       } catch (err) {
+        console.error('[SupabaseProvider] Auth initialization failed:', {
+          error: err,
+          message: err instanceof Error ? err.message : 'Unknown error',
+          stack: err instanceof Error ? err.stack : undefined
+        });
         setError(err instanceof Error ? err : new Error('Auth initialization failed'));
       } finally {
         setIsLoading(false);

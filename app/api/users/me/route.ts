@@ -7,13 +7,23 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
+    console.log('[/api/users/me] Starting request');
     const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
+    
+    console.log('[/api/users/me] Fetching session');
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('[/api/users/me] Session error:', sessionError);
+      return new NextResponse('Authentication error', { status: 401 });
+    }
 
     if (!session?.user) {
+      console.error('[/api/users/me] No session found');
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
+    console.log('[/api/users/me] Session found, fetching user data');
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
@@ -21,14 +31,21 @@ export async function GET() {
       .single();
 
     if (error) {
-      console.error('Error fetching user:', error);
+      console.error('[/api/users/me] Database error:', {
+        error,
+        userId: session.user.id,
+        message: error.message,
+        code: error.code
+      });
       return new NextResponse('Error fetching user data', { status: 500 });
     }
 
     if (!user) {
+      console.error('[/api/users/me] User not found in database:', session.user.id);
       return new NextResponse('User not found', { status: 404 });
     }
 
+    console.log('[/api/users/me] Successfully fetched user data');
     return NextResponse.json({
       id: user.id,
       email: user.email,
@@ -40,7 +57,11 @@ export async function GET() {
       updated_at: user.updated_at
     });
   } catch (error) {
-    console.error('Error in /api/users/me:', error);
+    console.error('[/api/users/me] Unhandled error:', {
+      error,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined
+    });
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
