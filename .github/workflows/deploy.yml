@@ -75,8 +75,8 @@ jobs:
           echo "Installing all dependencies at once..."
           npm ci
           
-          echo "Installing additional type definitions..."
-          npm install --save-dev @types/dotenv
+          echo "Installing additional dependencies..."
+          npm install --save-dev @types/dotenv dotenv typescript ts-node
           
           echo "Verifying installations..."
           ls -la node_modules/@types/dotenv || echo "@types/dotenv not found"
@@ -93,14 +93,9 @@ jobs:
         run: |
           supabase init --force
           supabase start
-          echo "Creating local env file for database sync..."
-          cat > .env.local.backup1 << EOL
-          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.DEVELOPMENT_SUPABASE_SERVICE_ROLE_KEY }}
-          EOL
-          echo "Running database sync..."
-          npx ts-node scripts/sync-db.ts
+          echo "Using production environment for database sync..."
+          echo "Running database sync with production environment..."
+          NODE_ENV=production npx ts-node scripts/sync-db.ts
       
       - name: Verify environment setup
         run: |
