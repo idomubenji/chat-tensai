@@ -65,7 +65,7 @@ export function useChannels() {
           }, () => {
             fetchChannels();
           })
-          .on('error', (error) => {
+          .on('system', { event: 'error' }, (error) => {
             console.error('Realtime subscription error:', error);
             // Attempt to reconnect after a delay
             setTimeout(() => {
@@ -75,7 +75,7 @@ export function useChannels() {
               }
             }, 5000);
           })
-          .on('disconnect', () => {
+          .on('system', { event: 'disconnect' }, () => {
             console.log('Realtime subscription disconnected');
             // Attempt to reconnect after a delay
             setTimeout(() => {

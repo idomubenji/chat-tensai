@@ -63,9 +63,9 @@ export function rateLimit(userId: string) {
 // Clean up old entries periodically
 setInterval(() => {
   const now = Date.now();
-  for (const [key, value] of store.entries()) {
+  Array.from(store.entries()).forEach(([key, value]) => {
     if (now > value.resetTime) {
       store.delete(key);
     }
-  }
+  });
 }, config.windowMs); 
