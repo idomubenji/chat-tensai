@@ -66,11 +66,11 @@ jobs:
       - name: Install dependencies
         run: |
           if [ -e package-lock.json ]; then
-            npm ci --production
+            npm ci
           else
-            npm install --production
+            npm install
           fi
-          npm install --save-dev typescript@latest @types/node@latest
+          npm install --save-dev typescript@latest @types/node@latest eslint@latest dotenv@latest @typescript-eslint/parser@latest @typescript-eslint/eslint-plugin@latest
       
       - name: Setup Supabase CLI
         if: steps.check_db.outputs.has_db_changes == 'true'
@@ -94,12 +94,17 @@ jobs:
       
       - name: Build application
         run: |
-          echo "Verifying environment variables..."
-          echo "NEXT_PUBLIC_SUPABASE_URL is: $NEXT_PUBLIC_SUPABASE_URL"
+          echo "Debug: Environment setup"
+          echo "NODE_ENV: $NODE_ENV"
+          echo "PWD: $PWD"
+          echo "Listing .env file:"
+          cat .env || echo ".env file not found"
+          echo "Listing .env.production file:"
+          cat .env.production || echo ".env.production file not found"
+          echo "NEXT_PUBLIC_SUPABASE_URL from env: $NEXT_PUBLIC_SUPABASE_URL"
+          echo "Secret length check:"
+          echo "NEXT_PUBLIC_PRODUCTION_SUPABASE_URL length: ${#NEXT_PUBLIC_SUPABASE_URL}"
           echo "Building application..."
-          export NEXT_PUBLIC_SUPABASE_URL="${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}"
-          export NEXT_PUBLIC_SUPABASE_ANON_KEY="${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}"
-          export SUPABASE_SERVICE_ROLE_KEY="${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}"
           npm run build
 
       - name: Setup SSH
