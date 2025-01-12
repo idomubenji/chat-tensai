@@ -115,14 +115,12 @@ jobs:
           
           echo "Environment variable check:"
           if [ -n "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
-            echo "Env var NEXT_PUBLIC_SUPABASE_ANON_KEY exists"
+            echo "Env var NEXT_PUBLIC_SUPABASE_ANON_KEY exists (length: ${#NEXT_PUBLIC_SUPABASE_ANON_KEY})"
           else
             echo "Env var NEXT_PUBLIC_SUPABASE_ANON_KEY is missing"
           fi
           
-          echo "Env var length: ${#NEXT_PUBLIC_SUPABASE_ANON_KEY}"
-          echo "Secret length: ${#${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}}"
-          
+          # Verify required variables are set
           if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
             echo "Error: NEXT_PUBLIC_SUPABASE_URL is not set"
             exit 1
