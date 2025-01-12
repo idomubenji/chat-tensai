@@ -34,7 +34,7 @@ jobs:
 
       - name: Start Supabase
         run: |
-          supabase init
+          supabase init --force
           supabase start
       
       - name: Build application
