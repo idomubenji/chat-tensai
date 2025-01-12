@@ -52,7 +52,7 @@ export function SignUpForm() {
         <div className="text-sm text-gray-500">
           Click the link in the email to verify your account and start using Chat Tensai.
           <br />
-          If you don't see the email, check your spam folder.
+          If you don&apos;t see the email, check your spam folder.
         </div>
         <Button
           type="button"
