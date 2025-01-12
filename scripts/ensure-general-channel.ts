@@ -64,8 +64,9 @@ async function main() {
         
         if (updateError) throw updateError;
         console.log('Updated channel name to #general');
+      } else {
+        console.log('#general channel already exists with ID:', existingChannel.id);
       }
-      console.log('#general channel already exists with ID:', existingChannel.id);
     }
 
     console.log('Done!');

@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import type { Database } from '@/types/supabase';
 
 export function useChannels() {
@@ -9,6 +10,7 @@ export function useChannels() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<Error | null>(null);
   const supabase = createClientComponentClient<Database>();
+  const { isLoaded, userId } = useSupabaseAuth();
 
   useEffect(() => {
     let isMounted = true;
@@ -17,6 +19,15 @@ export function useChannels() {
       try {
         setIsLoading(true);
         setError(null);
+
+        // Only fetch if we have a user
+        if (!userId) {
+          if (isMounted) {
+            setChannels([]);
+            setIsLoading(false);
+          }
+          return;
+        }
 
         const { data, error } = await supabase
           .from('channels')
@@ -39,23 +50,33 @@ export function useChannels() {
       }
     };
 
-    fetchChannels();
+    // Only fetch if auth is loaded
+    if (isLoaded) {
+      fetchChannels();
 
-    // Subscribe to changes
-    const subscription = supabase
-      .channel('channels')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
-        fetchChannels();
-      })
-      .subscribe();
+      // Subscribe to changes only if we have a user
+      if (userId) {
+        const subscription = supabase
+          .channel('channels')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'channels' }, () => {
+            fetchChannels();
+          })
+          .subscribe();
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      }
+    }
 
     return () => {
       isMounted = false;
-      subscription.unsubscribe();
     };
-  }, [supabase]);
+  }, [supabase, isLoaded, userId]);
 
   const addChannel = async (name: string) => {
+    if (!userId) return null;
+
     try {
       setError(null);
       const { data, error } = await supabase
@@ -74,6 +95,8 @@ export function useChannels() {
   };
 
   const deleteChannel = async (channelId: string) => {
+    if (!userId) return;
+
     try {
       setError(null);
       const { error } = await supabase
