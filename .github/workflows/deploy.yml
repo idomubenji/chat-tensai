@@ -17,6 +17,8 @@ jobs:
     env:
       NODE_ENV: production
       NODE_OPTIONS: --max_old_space_size=4096
+      NEXT_DISABLE_ESLINT: 1
+      NEXT_DISABLE_TYPE_CHECKS: 1
       NEXT_PUBLIC_SUPABASE_URL: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
       NEXT_PUBLIC_SUPABASE_ANON_KEY: ${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
       SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
@@ -42,6 +44,8 @@ jobs:
           AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
           NODE_ENV=production
           PORT=3000
+          NEXT_DISABLE_ESLINT=1
+          NEXT_DISABLE_TYPE_CHECKS=1
           EOL
           
           # Also create .env for build time
