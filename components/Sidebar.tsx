@@ -81,10 +81,9 @@ export function Sidebar() {
           className="hover:opacity-80 transition-opacity"
         >
           <ProfilePicture 
-            avatarUrl={userData?.avatar_url}
-            size="default"
             borderColor="black"
             borderWidth="thin"
+            size="default"
           />
         </button>
         <SignOutButton />
