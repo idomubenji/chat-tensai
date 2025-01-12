@@ -5,6 +5,10 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - '**.md'
+      - 'docs/**'
+      - '.gitignore'
 
 jobs:
   deploy:
@@ -17,6 +21,18 @@ jobs:
     
     steps:
       - uses: actions/checkout@v3
+        with:
+          fetch-depth: 2
+      
+      - name: Check for database changes
+        id: check_db
+        run: |
+          CHANGED=$(git diff --name-only HEAD^ HEAD | grep -E "^supabase/migrations/|^supabase/config" || true)
+          if [ ! -z "$CHANGED" ]; then
+            echo "has_db_changes=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_db_changes=false" >> $GITHUB_OUTPUT
+          fi
       
       - name: Setup Node.js
         uses: actions/setup-node@v3
@@ -25,17 +41,33 @@ jobs:
           cache: 'npm'
       
       - name: Install dependencies
-        run: npm ci
+        run: |
+          if [ -e package-lock.json ]; then
+            npm ci --production
+          else
+            npm install --production
+          fi
+          npm install --save-dev typescript@latest @types/node@latest
       
       - name: Setup Supabase CLI
+        if: steps.check_db.outputs.has_db_changes == 'true'
         uses: supabase/setup-cli@v1
         with:
           version: latest
 
-      - name: Start Supabase
+      - name: Start Supabase and Sync Database
+        if: steps.check_db.outputs.has_db_changes == 'true'
         run: |
           supabase init --force
           supabase start
+          echo "Creating local env file for database sync..."
+          cat > .env.local.backup1 << EOL
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.DEVELOPMENT_SUPABASE_SERVICE_ROLE_KEY }}
+          EOL
+          echo "Running database sync..."
+          npx ts-node scripts/sync-db.ts
       
       - name: Build application
         run: npm run build
@@ -65,18 +97,6 @@ jobs:
           NODE_ENV=production
           PORT=3000
           EOL
-
-      - name: Sync Database Schema
-        run: |
-          echo "Creating local env file for database sync..."
-          cat > .env.local.backup1 << EOL
-          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_DEVELOPMENT_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.DEVELOPMENT_SUPABASE_SERVICE_ROLE_KEY }}
-          EOL
-          
-          echo "Running database sync..."
-          npx ts-node scripts/sync-db.ts
 
       - name: Deploy to EC2
         env:
@@ -111,7 +131,10 @@ jobs:
             sudo pm2 stop chat-genius 2>/dev/null || true
             
             echo "Cleaning up old deployment..."
-            rm -rf ~/chat-genius
+            # Use sudo to handle permission issues
+            if [ -d "~/chat-genius" ]; then
+              sudo rm -rf ~/chat-genius
+            fi
             mkdir -p ~/chat-genius
             
             echo "Extracting new deployment..."
@@ -131,8 +154,11 @@ jobs:
             cp -v .env.production .next/standalone/
             cp -v ecosystem.config.js .next/standalone/
             
+            # Ensure proper ownership of all files
+            echo "Setting correct permissions..."
+            sudo chown -R ec2-user:ec2-user ~/chat-genius
+            
             echo "Starting application..."
-            sudo pm2 delete chat-genius 2>/dev/null || true
             cd .next/standalone
             sudo -E NODE_ENV=production pm2 start server.js --name "chat-genius" && sudo pm2 save
             
