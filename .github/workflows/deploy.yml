@@ -69,19 +69,14 @@ jobs:
       
       - name: Install dependencies
         run: |
-          echo "Installing production dependencies first..."
-          if [ -e package-lock.json ]; then
-            npm ci --production
-          else
-            npm install --production
-          fi
+          echo "Installing all dependencies at once..."
+          npm ci
           
-          echo "Installing dev dependencies separately..."
-          npm install --save-dev eslint typescript @typescript-eslint/parser @typescript-eslint/eslint-plugin dotenv
+          echo "Installing additional type definitions..."
+          npm install --save-dev @types/dotenv
           
           echo "Verifying installations..."
-          ls -la node_modules/.bin/eslint || echo "eslint not found"
-          ls -la node_modules/.bin/tsc || echo "typescript not found"
+          ls -la node_modules/@types/dotenv || echo "@types/dotenv not found"
           ls -la node_modules/dotenv || echo "dotenv not found"
 
       - name: Setup Supabase CLI
