@@ -35,13 +35,13 @@ jobs:
       - name: Create env file
         run: |
           cat > .env.production << EOL
-          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_URL }}
-          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.NEXT_PUBLIC_PRODUCTION_SUPABASE_ANON_KEY }}
-          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.PRODUCTION_SUPABASE_SERVICE_ROLE_KEY }}
-          AWS_REGION=${{ secrets.AWS_REGION }}
-          AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_BUCKET_NAME=${{ secrets.AWS_BUCKET_NAME }}
+          NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+          SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+          AWS_REGION=${AWS_REGION}
+          AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+          AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+          AWS_BUCKET_NAME=${AWS_BUCKET_NAME}
           NODE_ENV=production
           PORT=3000
           NEXT_DISABLE_ESLINT=1
@@ -50,6 +50,10 @@ jobs:
           
           # Also create .env for build time
           cp .env.production .env
+          
+          # Debug: verify env file contents
+          echo "Verifying environment variables in .env:"
+          cat .env | grep -v '_KEY' | grep -v '_SECRET'
       
       - name: Check for database changes
         id: check_db
@@ -98,6 +102,19 @@ jobs:
           EOL
           echo "Running database sync..."
           npx ts-node scripts/sync-db.ts
+      
+      - name: Verify environment setup
+        run: |
+          echo "Checking environment variables..."
+          if [ -z "$NEXT_PUBLIC_SUPABASE_URL" ]; then
+            echo "Error: NEXT_PUBLIC_SUPABASE_URL is not set"
+            exit 1
+          fi
+          if [ -z "$NEXT_PUBLIC_SUPABASE_ANON_KEY" ]; then
+            echo "Error: NEXT_PUBLIC_SUPABASE_ANON_KEY is not set"
+            exit 1
+          fi
+          echo "Environment variables verified successfully"
       
       - name: Build application
         run: |
