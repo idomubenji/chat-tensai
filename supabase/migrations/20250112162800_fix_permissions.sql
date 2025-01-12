@@ -113,4 +113,8 @@ CREATE POLICY "Enable insert for authenticated users"
 ON public.files
 FOR INSERT
 TO authenticated
-WITH CHECK (auth.uid()::text = uploaded_by::text); 
+WITH CHECK (EXISTS (
+  SELECT 1 FROM messages m
+  WHERE m.id = message_id
+  AND m.user_id = auth.uid()::text
+)); 
