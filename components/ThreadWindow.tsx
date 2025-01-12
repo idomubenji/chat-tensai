@@ -533,7 +533,6 @@ export function ThreadWindow({
                     size="default"
                     borderColor={isCurrentUser ? "black" : "white"}
                     borderWidth="thin"
-                    shouldFetch={false}
                     avatarUrl={message.user.avatar_url}
                   />
                 </div>

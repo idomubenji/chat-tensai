@@ -31,7 +31,7 @@ export function ChatWindow({
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const { userId } = useSupabaseAuth();
+  const { userId, user } = useSupabaseAuth();
 
   useEffect(() => {
     if (isLoading) {
@@ -73,7 +73,8 @@ export function ChatWindow({
       user: {
         id: userId || '',
         name: 'You',
-        avatar_url: null
+        avatar_url: user?.user_metadata?.avatar_url || null,
+        role: user?.role || 'USER'
       },
       reactions: {},
       replies: { count: 0 }
@@ -493,7 +494,6 @@ export function ChatWindow({
                       size="default"
                       borderColor={isCurrentUser ? "black" : "white"}
                       borderWidth="thin"
-                      shouldFetch={false}
                       avatarUrl={message.user.avatar_url}
                     />
                   </div>

@@ -15,11 +15,23 @@ import { MessageSquare } from 'lucide-react';
 import { ProfilePicture } from '@/components/ProfilePicture';
 import { SignOutButton } from '@/components/SignOutButton';
 import Image from 'next/image';
+import useSWR from 'swr';
+
+// Fetch function that SWR will use
+const fetcher = async (url: string) => {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error('Failed to fetch user data');
+  const data = await res.json();
+  return data;
+};
 
 export function Sidebar() {
   const { user } = useSupabaseAuth();
   const { channels, isLoading } = useChannels();
   const router = useRouter();
+
+  // Fetch user data from the database
+  const { data: userData } = useSWR('/api/users/me', fetcher);
 
   if (!user) return null;
 
@@ -68,14 +80,12 @@ export function Sidebar() {
           onClick={handleProfileClick}
           className="hover:opacity-80 transition-opacity"
         >
-          <div className="w-12 h-12">
-            <ProfilePicture 
-              shouldFetch
-              borderColor="black"
-              borderWidth="thin"
-              size="default"
-            />
-          </div>
+          <ProfilePicture 
+            avatarUrl={userData?.avatar_url}
+            size="default"
+            borderColor="black"
+            borderWidth="thin"
+          />
         </button>
         <SignOutButton />
       </div>

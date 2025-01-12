@@ -43,11 +43,8 @@ export function PersonalCard({ className }: PersonalCardProps) {
     <div className="bg-[#0A1A3B] rounded-2xl p-6 flex items-center gap-6 min-h-[192px]">
       <div className="relative h-[154px] w-[154px] flex-shrink-0">
         <ProfilePicture 
-          size="large" 
+          size={154}
           avatarUrl={userData?.avatar_url} 
-          isLoading={!userData && !error}
-          borderColor="white"
-          borderWidth="thick"
         />
         {hasStatus && (
           <div className="absolute left-0 top-0 bg-gray-100/80 backdrop-blur-sm rounded-lg px-2.5 py-1 flex items-center gap-1.5 text-gray-800 text-sm border border-gray-200 shadow-lg z-10">

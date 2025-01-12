@@ -56,69 +56,6 @@ export async function POST(req: Request) {
     }
     const userId = session.user.id;
 
-    console.log('\n=== AVATAR UPLOAD: START ===');
-    console.log('Attempting operation with:', {
-      userId,
-      userIdType: typeof userId,
-      userIdLength: userId.length
-    });
-
-    // Let's check what users exist in Supabase
-    const { data: allUsers, error: listError } = await supabase
-      .from('users')
-      .select('id, email')
-      .limit(5);
-
-    console.log('Supabase users:', {
-      users: allUsers?.map(user => ({
-        id: user.id,
-        idType: typeof user.id,
-        idLength: user.id.length,
-        email: user.email
-      }))
-    });
-    
-    if (listError) {
-      console.error('Error listing users:', listError);
-    }
-
-    // Try to find the user directly
-    const { data: user, error: findError } = await supabase
-      .from('users')
-      .select('*')
-      .eq('id', userId)
-      .maybeSingle();
-
-    console.log('User lookup result:', {
-      found: !!user,
-      error: findError?.message,
-      lookupId: userId,
-      userData: user
-    });
-
-    if (!user) {
-      console.log('=== AVATAR UPLOAD: USER NOT FOUND ===\n');
-      // Try to create the user
-      const { data: newUser, error: createError } = await supabase
-        .from('users')
-        .insert({
-          id: userId,
-          email: 'placeholder@example.com', // We'll update this later
-          name: 'New User',
-          role: 'USER',
-          status: 'ONLINE',
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-
-      if (createError) {
-        console.error('Failed to create user:', createError);
-        return new NextResponse('Failed to create user', { status: 500 });
-      }
-      console.log('Created new user:', newUser);
-    }
-
     // 2. Get and validate file
     const formData = await req.formData();
     const file = formData.get('file') as File;
@@ -151,16 +88,7 @@ export async function POST(req: Request) {
         ContentType: file.type,
       });
 
-      console.log('Attempting S3 upload with:', {
-        bucket: process.env.AWS_BUCKET_NAME,
-        key: fileName,
-        contentType: file.type,
-        region: process.env.AWS_REGION,
-        // Don't log credentials!
-      });
-
       await s3.send(putCommand);
-      console.log('Successfully uploaded file to S3:', fileName);
 
       // Generate a signed URL for the uploaded file
       const getCommand = new GetObjectCommand({
@@ -170,10 +98,10 @@ export async function POST(req: Request) {
 
       const signedUrl = await getSignedUrl(s3, getCommand, { expiresIn: URL_EXPIRATION });
 
-      // Update user's avatar URL in Supabase
+      // Store just the S3 key in the database
       const { error: updateError } = await supabase
         .from('users')
-        .update({ avatar_url: signedUrl })
+        .update({ avatar_url: fileName })
         .eq('id', userId);
 
       if (updateError) {
@@ -181,6 +109,7 @@ export async function POST(req: Request) {
         return new NextResponse('Failed to update avatar URL', { status: 500 });
       }
 
+      // Return the signed URL for immediate use
       return NextResponse.json({ url: signedUrl });
     } catch (error: any) {
       const s3Error = error as Error;

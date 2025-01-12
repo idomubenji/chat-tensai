@@ -1,52 +1,32 @@
-import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
-import { cookies } from 'next/headers';
+import { createSupabaseAdminClient } from '@/lib/supabase';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
+import { getAuthUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    console.log('[/api/users/me] Starting request');
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    
-    console.log('[/api/users/me] Fetching session');
-    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-    
-    if (sessionError) {
-      console.error('[/api/users/me] Session error:', {
-        error: sessionError,
-        message: sessionError.message,
-        status: sessionError.status,
-        name: sessionError.name
-      });
-      return new NextResponse('Authentication error', { status: 401 });
-    }
-
-    if (!session?.user) {
-      console.error('[/api/users/me] No session found', {
-        hasSession: !!session,
-        cookies: cookies().getAll().map(c => ({ name: c.name }))
-      });
+    const userId = await getAuthUserId();
+    if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     console.log('[/api/users/me] Session found, fetching user data', {
-      userId: session.user.id,
-      userEmail: session.user.email,
-      accessToken: session.access_token ? 'present' : 'missing'
+      userId
     });
     
+    const supabase = createSupabaseAdminClient();
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .single();
 
     if (error) {
       console.error('[/api/users/me] Database error:', {
         error,
-        userId: session.user.id,
+        userId,
         message: error.message,
         code: error.code
       });
@@ -54,7 +34,7 @@ export async function GET() {
     }
 
     if (!user) {
-      console.error('[/api/users/me] User not found in database:', session.user.id);
+      console.error('[/api/users/me] User not found in database:', userId);
       return new NextResponse('User not found', { status: 404 });
     }
 
@@ -81,10 +61,8 @@ export async function GET() {
 
 export async function PATCH(req: Request) {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session?.user) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -97,6 +75,7 @@ export async function PATCH(req: Request) {
     }
 
     // Update user profile
+    const supabase = createSupabaseAdminClient();
     const { data: user, error: updateError } = await supabase
       .from('users')
       .update({
@@ -107,7 +86,7 @@ export async function PATCH(req: Request) {
         name,
         updated_at: new Date().toISOString()
       })
-      .eq('id', session.user.id)
+      .eq('id', userId)
       .select()
       .single();
 
@@ -125,18 +104,18 @@ export async function PATCH(req: Request) {
 
 export async function DELETE() {
   try {
-    const supabase = createRouteHandlerClient<Database>({ cookies });
-    const { data: { session } } = await supabase.auth.getSession();
-
-    if (!session?.user) {
+    const userId = await getAuthUserId();
+    if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
+
+    const supabase = createSupabaseAdminClient();
 
     // First, delete all user's messages
     const { error: messagesError } = await supabase
       .from('messages')
       .delete()
-      .eq('user_id', session.user.id);
+      .eq('user_id', userId);
 
     if (messagesError) throw messagesError;
 
@@ -144,12 +123,9 @@ export async function DELETE() {
     const { error: userError } = await supabase
       .from('users')
       .delete()
-      .eq('id', session.user.id);
+      .eq('id', userId);
 
     if (userError) throw userError;
-
-    // Sign out the user
-    await supabase.auth.signOut();
 
     return new NextResponse(null, { status: 204 });
   } catch (error) {

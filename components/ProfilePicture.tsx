@@ -1,16 +1,13 @@
+import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
-import useSWR from 'swr';
-import { defaultSWRConfig } from '@/lib/swr-config';
 
 interface ProfilePictureProps {
-  size?: 'default' | 'large';
+  avatarUrl: string | null;
+  size?: 'default' | 'large' | number;
   className?: string;
-  avatarUrl?: string | null;
-  isLoading?: boolean;
   borderColor?: 'black' | 'white';
   borderWidth?: 'thin' | 'thick';
-  shouldFetch?: boolean;
 }
 
 const sizeClasses = {
@@ -28,56 +25,61 @@ const borderWidthClasses = {
   thick: 'border-4',
 };
 
-// Key for the user data SWR cache
-export const USER_DATA_KEY = '/api/users/me';
-
-// Fetch function that SWR will use
-const fetcher = async (url: string) => {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error('Failed to fetch user data');
-  const data = await res.json();
-  return data;
-};
-
 export function ProfilePicture({ 
+  avatarUrl, 
   size = 'default', 
-  className,
-  avatarUrl,
-  isLoading = false,
+  className = '',
   borderColor = 'white',
-  borderWidth = 'thick',
-  shouldFetch = false,
+  borderWidth = 'thick'
 }: ProfilePictureProps) {
-  // Only fetch if shouldFetch is true and no avatarUrl is provided
-  const { data: userData, error } = useSWR(
-    shouldFetch ? USER_DATA_KEY : null,
-    fetcher,
-    defaultSWRConfig
-  );
+  const [finalAvatarUrl, setFinalAvatarUrl] = useState<string>('/default-avatar.png');
 
-  const finalAvatarUrl = avatarUrl || userData?.avatar_url || "/default-avatar.jpeg";
-  const showLoading = isLoading || (shouldFetch && !userData && !error);
+  useEffect(() => {
+    async function getSignedUrl() {
+      if (!avatarUrl) {
+        setFinalAvatarUrl('/default-avatar.jpeg');
+        return;
+      }
+
+      if (!avatarUrl.startsWith('avatars/')) {
+        setFinalAvatarUrl(avatarUrl);
+        return;
+      }
+
+      try {
+        const response = await fetch(`/api/s3-url?key=${encodeURIComponent(avatarUrl)}`);
+        if (!response.ok) throw new Error('Failed to get signed URL');
+        const data = await response.json();
+        setFinalAvatarUrl(data.url);
+      } catch (error) {
+        console.error('Error getting signed URL:', error);
+        setFinalAvatarUrl('/default-avatar.jpeg');
+      }
+    }
+
+    getSignedUrl();
+  }, [avatarUrl]);
+
+  const sizeValue = typeof size === 'number' ? size : undefined;
+  const sizeClass = typeof size === 'string' ? sizeClasses[size] : `w-[${size}px] h-[${size}px]`;
 
   return (
-    <div className={cn("relative", sizeClasses[size], className)}>
+    <div className={cn("relative", sizeClass, className)}>
       <div className={cn(
         "absolute inset-0 rounded-full z-10 border",
         borderClasses[borderColor],
         borderWidthClasses[borderWidth]
       )} />
-      {showLoading ? (
-        <div className="absolute inset-0 rounded-full bg-gray-700 animate-pulse" />
-      ) : (
+      <div className="relative w-full h-full">
         <Image
           src={finalAvatarUrl}
-          alt="Profile"
+          alt="Profile picture"
           fill
-          sizes={size === 'large' ? '192px' : '48px'}
-          className="rounded-full object-cover hover:opacity-80 transition-opacity"
-          priority
-          unoptimized={finalAvatarUrl === "/default-avatar.jpeg"}
+          sizes={typeof size === 'string' ? (size === 'large' ? '192px' : '48px') : `${size}px`}
+          className="rounded-full object-cover"
+          unoptimized={true}
         />
-      )}
+      </div>
     </div>
   );
 }

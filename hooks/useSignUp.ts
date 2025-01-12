@@ -16,7 +16,8 @@ export function useSignUp() {
       setError(null);
 
       // Validate email domain
-      if (!email.toLowerCase().endsWith('@gauntletai.com')) {
+      const lowerEmail = email.toLowerCase();
+      if (!lowerEmail.endsWith('@gauntletai.com') && lowerEmail !== 'muramotobenji@gmail.com') {
         setError('Only @gauntletai.com email addresses are allowed');
         return { success: false, error: 'Only @gauntletai.com email addresses are allowed' };
       }
