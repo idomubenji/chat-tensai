@@ -1,28 +1,28 @@
 import { execSync } from 'child_process';
 import dotenv from 'dotenv';
 
-// Load environment variables from both .env files
+// Load environment variables from production and local backup
 dotenv.config({ path: '.env.production' });
-dotenv.config({ path: '.env.local' });
+dotenv.config({ path: '.env.local.backup1' });
 
 async function main() {
   try {
-    console.log('Syncing database schema with production...');
+    console.log('🔄 Syncing database schema with production...');
 
-    // Use Supabase CLI to pull the schema
-    console.log('Pulling schema from production using Supabase CLI...');
+    // Pull the schema from production
+    console.log('📥 Pulling current schema from development...');
     execSync(
-      'npx supabase db remote commit',
+      'npx supabase db pull',
       { stdio: 'inherit' }
     );
 
     // Reset and apply migrations to local database
-    console.log('Applying schema to local database...');
+    console.log('🔄 Applying schema to local database...');
     execSync('npx supabase db reset', { stdio: 'inherit' });
 
-    console.log('Database schema sync completed successfully!');
+    console.log('✅ Database schema sync completed successfully!');
   } catch (error) {
-    console.error('Error syncing database schema:', error);
+    console.error('❌ Error syncing database schema:', error);
     process.exit(1);
   }
 }
