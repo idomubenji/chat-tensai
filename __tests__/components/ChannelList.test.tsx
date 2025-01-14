@@ -1,129 +1,206 @@
-import React from 'react';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { ChannelList } from '@/components/ChannelList';
-import '@testing-library/jest-dom';
+import { useRouter } from 'next/navigation';
+import { useChannels } from '@/hooks/useChannels';
 
-// Mock data
-const mockChannels = [
-  { id: '1', name: 'general' },
-  { id: '2', name: 'random' },
-];
+// Mock next/navigation
+jest.mock('next/navigation', () => ({
+  useRouter: jest.fn(),
+}));
 
-// Mock functions
-const mockOnSelectChannel = jest.fn();
-const mockOnAddChannel = jest.fn();
+// Mock useChannels hook
+jest.mock('@/hooks/useChannels', () => ({
+  useChannels: jest.fn(),
+}));
 
 describe('ChannelList', () => {
+  const mockRouter = {
+    push: jest.fn(),
+  };
+
+  const mockAddChannel = jest.fn();
+
   beforeEach(() => {
+    // Reset mocks
     jest.clearAllMocks();
+
+    // Setup router mock
+    (useRouter as jest.Mock).mockReturnValue(mockRouter);
+
+    // Setup useChannels mock with default values
+    (useChannels as jest.Mock).mockReturnValue({
+      addChannel: mockAddChannel,
+    });
   });
 
-  it('renders channels correctly', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+  describe('Character limit enforcement', () => {
+    it('should not allow more than 25 characters in channel name input', async () => {
+      render(<ChannelList channels={[]} isLoading={false} />);
 
-    expect(screen.getByText('general')).toBeInTheDocument();
-    expect(screen.getByText('random')).toBeInTheDocument();
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Get input field
+      const input = screen.getByPlaceholderText('Enter channel name...');
+
+      // Type a long string
+      fireEvent.change(input, { target: { value: 'a'.repeat(30) } });
+
+      // Check that input value is truncated to 25 characters
+      expect(input).toHaveValue('a'.repeat(25));
+    });
+
+    it('should show character count', () => {
+      render(<ChannelList channels={[]} isLoading={false} />);
+
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Type some text
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: 'test' } });
+
+      // Check character count
+      expect(screen.getByText('4/25 characters')).toBeInTheDocument();
+    });
   });
 
-  it('calls onSelectChannel when a channel is clicked', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+  describe('Input validation', () => {
+    it('should show error for empty channel name', () => {
+      render(<ChannelList channels={[]} isLoading={false} />);
 
-    fireEvent.click(screen.getByText('general'));
-    expect(mockOnSelectChannel).toHaveBeenCalledWith('1');
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Type space only
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: '   ' } });
+
+      // Check error message
+      expect(screen.getByText('Channel name cannot be empty')).toBeInTheDocument();
+    });
+
+    it('should show error for invalid characters', () => {
+      render(<ChannelList channels={[]} isLoading={false} />);
+
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Type invalid characters
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: 'test@#$%' } });
+
+      // Check error message
+      expect(screen.getByText('Channel name can only contain letters, numbers, and spaces')).toBeInTheDocument();
+    });
   });
 
-  it('opens dialog when Add Channel button is clicked', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+  describe('Channel creation flow', () => {
+    it('should create channel and redirect on success', async () => {
+      mockAddChannel.mockResolvedValueOnce({ id: '123', name: '#test' });
 
-    fireEvent.click(screen.getByText('Add Channel'));
-    expect(screen.getByText('Create New Channel')).toBeInTheDocument();
+      render(<ChannelList channels={[]} isLoading={false} />);
+
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Type valid channel name
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: 'test' } });
+
+      // Click Add Channel button
+      fireEvent.click(screen.getByText('Add Channel'));
+
+      // Check if addChannel was called with correct name
+      await waitFor(() => {
+        expect(mockAddChannel).toHaveBeenCalledWith('#test');
+      });
+
+      // Check if router.push was called with correct channel ID
+      await waitFor(() => {
+        expect(mockRouter.push).toHaveBeenCalledWith('/channels/123');
+      });
+    });
+
+    it('should show error on duplicate channel name', async () => {
+      mockAddChannel.mockRejectedValueOnce(new Error('A channel with this name already exists'));
+
+      render(<ChannelList channels={[]} isLoading={false} />);
+
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
+
+      // Type channel name
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: 'test' } });
+
+      // Click Add Channel button
+      fireEvent.click(screen.getByText('Add Channel'));
+
+      // Check error message
+      await waitFor(() => {
+        expect(screen.getByText('Failed to create channel. Please try again.')).toBeInTheDocument();
+      });
+    });
   });
 
-  it('shows error when trying to add empty channel name', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+  describe('Channel limit enforcement', () => {
+    it('should hide add channel button when limit reached', () => {
+      // Create array of 10 channels
+      const channels = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        name: `#channel${i}`,
+        description: null,
+        created_by_id: 'test-user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
 
-    fireEvent.click(screen.getByText('Add Channel'));
-    const submitButton = screen.getByText('Create Channel');
-    fireEvent.click(submitButton);
+      render(<ChannelList channels={channels} isLoading={false} />);
 
-    expect(screen.getByText('hey, there\'s nothing in the text box, don\'t you try and get away with that')).toBeInTheDocument();
+      // Check that add channel button is not present
+      expect(screen.queryByText('+ ADD CHANNEL')).not.toBeInTheDocument();
+    });
+
+    it('should show add channel button when under limit', () => {
+      // Create array of 9 channels
+      const channels = Array.from({ length: 9 }, (_, i) => ({
+        id: `${i}`,
+        name: `#channel${i}`,
+        description: null,
+        created_by_id: 'test-user',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      }));
+
+      render(<ChannelList channels={channels} isLoading={false} />);
+
+      // Check that add channel button is present
+      expect(screen.getByText('+ ADD CHANNEL')).toBeInTheDocument();
+    });
   });
 
-  it('shows error when trying to add duplicate channel name', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+  describe('Loading states', () => {
+    it('should disable inputs and show spinner during channel creation', async () => {
+      // Make addChannel take some time to resolve
+      mockAddChannel.mockImplementationOnce(() => new Promise(resolve => setTimeout(resolve, 100)));
 
-    fireEvent.click(screen.getByText('Add Channel'));
-    const input = screen.getByPlaceholderText('Enter channel name');
-    fireEvent.change(input, { target: { value: 'general' } });
-    const submitButton = screen.getByText('Create Channel');
-    fireEvent.click(submitButton);
+      render(<ChannelList channels={[]} isLoading={false} />);
 
-    expect(screen.getByText('we already have a channel with that name young man')).toBeInTheDocument();
-  });
+      // Open dialog
+      fireEvent.click(screen.getByText('+ ADD CHANNEL'));
 
-  it('successfully adds a new channel', () => {
-    render(
-      <ChannelList
-        channels={mockChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
+      // Type channel name
+      const input = screen.getByPlaceholderText('Enter channel name...');
+      fireEvent.change(input, { target: { value: 'test' } });
 
-    fireEvent.click(screen.getByText('Add Channel'));
-    const input = screen.getByPlaceholderText('Enter channel name');
-    fireEvent.change(input, { target: { value: 'new-channel' } });
-    const submitButton = screen.getByText('Create Channel');
-    fireEvent.click(submitButton);
+      // Click Add Channel button
+      fireEvent.click(screen.getByText('Add Channel'));
 
-    expect(mockOnAddChannel).toHaveBeenCalledWith('new-channel');
-  });
-
-  it('disables Add Channel button when maximum channels reached', () => {
-    const maxChannels = Array.from({ length: 10 }, (_, i) => ({
-      id: String(i + 1),
-      name: `channel-${i + 1}`,
-    }));
-
-    render(
-      <ChannelList
-        channels={maxChannels}
-        onSelectChannel={mockOnSelectChannel}
-        onAddChannel={mockOnAddChannel}
-      />
-    );
-
-    const addButton = screen.getByText('Add Channel').closest('button');
-    expect(addButton).toBeDisabled();
+      // Check loading state
+      expect(screen.getByText('Creating...')).toBeInTheDocument();
+      expect(input).toBeDisabled();
+      expect(screen.getByText('Cancel')).toBeDisabled();
+    });
   });
 }); 

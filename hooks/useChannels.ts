@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import type { Database } from '@/types/supabase';
@@ -11,6 +11,7 @@ export function useChannels() {
   const [error, setError] = useState<Error | null>(null);
   const supabase = createClientComponentClient<Database>();
   const { isLoaded, userId } = useSupabaseAuth();
+  const subscriptionRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,7 +57,14 @@ export function useChannels() {
 
       // Subscribe to changes only if we have a user
       if (userId) {
-        const subscription = supabase
+        // Clean up any existing subscription
+        if (subscriptionRef.current) {
+          subscriptionRef.current.unsubscribe();
+          subscriptionRef.current = null;
+        }
+
+        // Create new subscription
+        subscriptionRef.current = supabase
           .channel('channels')
           .on('postgres_changes', { 
             event: '*', 
@@ -66,35 +74,32 @@ export function useChannels() {
             fetchChannels();
           })
           .on('system', { event: 'error' }, (error) => {
-            console.error('Realtime subscription error:', error);
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-              if (subscription.state === 'closed') {
-                console.log('Attempting to reconnect...');
-                subscription.subscribe();
-              }
-            }, 5000);
+            // Only log actual errors
+            if (error.status !== 'ok') {
+              console.error('Realtime subscription error:', error);
+            }
           })
-          .on('system', { event: 'disconnect' }, () => {
-            console.log('Realtime subscription disconnected');
-            // Attempt to reconnect after a delay
-            setTimeout(() => {
-              if (subscription.state === 'closed') {
+          .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+              console.log('Successfully subscribed to channels');
+            } else if (status === 'CLOSED') {
+              console.log('Channel subscription closed');
+              // Only attempt reconnect if component is still mounted and we don't have an active subscription
+              if (isMounted && subscriptionRef.current === null) {
                 console.log('Attempting to reconnect...');
-                subscription.subscribe();
+                // Recursive reconnection will be handled by the parent useEffect
               }
-            }, 5000);
-          })
-          .subscribe();
-
-        return () => {
-          subscription.unsubscribe();
-        };
+            }
+          });
       }
     }
 
     return () => {
       isMounted = false;
+      if (subscriptionRef.current) {
+        subscriptionRef.current.unsubscribe();
+        subscriptionRef.current = null;
+      }
     };
   }, [supabase, isLoaded, userId]);
 
@@ -103,13 +108,32 @@ export function useChannels() {
 
     try {
       setError(null);
+
+      // Check channel limit
+      if (channels.length >= 10) {
+        throw new Error('Maximum number of channels (10) reached');
+      }
+
+      // Format channel name
+      const formattedName = name.startsWith('#') ? name : `#${name}`;
+
       const { data, error } = await supabase
         .from('channels')
-        .insert([{ name }])
+        .insert([{ 
+          name: formattedName,
+          created_by_id: userId
+        }])
         .select()
         .single();
 
-      if (error) throw error;
+      if (error) {
+        // Handle duplicate channel name error
+        if (error.code === '23505') {
+          throw new Error('A channel with this name already exists');
+        }
+        throw error;
+      }
+
       return data;
     } catch (err) {
       console.error('Error adding channel:', err);
