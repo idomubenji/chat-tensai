@@ -5,7 +5,7 @@ echo "Building the application..."
 npm run build
 
 # Create deployment directory if it doesn't exist
-ssh -i ~/.ssh/chat-genius-ec2.pem ec2-user@44.200.83.77 'mkdir -p ~/chat-genius'
+ssh -i ~/.ssh/chat-tensai-ec2.pem ec2-user@44.200.83.77 'mkdir -p ~/chat-tensai'
 
 # Copy only the necessary files to EC2
 echo "Copying files to EC2..."
@@ -18,7 +18,7 @@ rsync -av --progress \
     --exclude '.env.development' \
     --exclude 'tests' \
     --exclude '__tests__' \
-    -e "ssh -i ~/.ssh/chat-genius-ec2.pem" \
+    -e "ssh -i ~/.ssh/chat-tensai-ec2.pem" \
     .next \
     package.json \
     package-lock.json \
@@ -27,12 +27,12 @@ rsync -av --progress \
     ecosystem.config.js \
     scripts \
     public \
-    ec2-user@44.200.83.77:~/chat-genius/
+    ec2-user@44.200.83.77:~/chat-tensai/
 
 # SSH into the instance and set up the environment
 echo "Setting up the environment..."
-ssh -i ~/.ssh/chat-genius-ec2.pem ec2-user@44.200.83.77 'bash -s' << 'ENDSSH'
-    cd ~/chat-genius
+ssh -i ~/.ssh/chat-tensai-ec2.pem ec2-user@44.200.83.77 'bash -s' << 'ENDSSH'
+    cd ~/chat-tensai
     # Install Node.js if not already installed
     if ! command -v node &> /dev/null; then
         curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
@@ -48,7 +48,7 @@ ssh -i ~/.ssh/chat-genius-ec2.pem ec2-user@44.200.83.77 'bash -s' << 'ENDSSH'
     fi
     
     # Start the application with PM2
-    pm2 delete chat-genius 2>/dev/null || true
+    pm2 delete chat-tensai 2>/dev/null || true
     pm2 start ecosystem.config.js
     
     # Save PM2 process list and configure to start on reboot

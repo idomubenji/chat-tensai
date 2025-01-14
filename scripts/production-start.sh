@@ -28,7 +28,7 @@ echo "Cleaning up dev dependencies..."
 npm prune --production
 
 echo "Starting application with PM2..."
-pm2 delete chat-genius 2>/dev/null || true
+pm2 delete chat-tensai 2>/dev/null || true
 
 # Clean up any existing .next cache
 echo "Cleaning up .next cache..."
@@ -47,7 +47,7 @@ pm2 save
 
 echo "Setup complete! Application should be running."
 echo "Check status with: pm2 list"
-echo "View logs with: pm2 logs chat-genius"
+echo "View logs with: pm2 logs chat-tensai"
 
 # Print current process status
 echo "Current PM2 processes:"
@@ -55,4 +55,4 @@ pm2 list
 
 # Print recent logs
 echo "Recent application logs:"
-pm2 logs chat-genius --lines 20 || true 
+pm2 logs chat-tensai --lines 20 || true 

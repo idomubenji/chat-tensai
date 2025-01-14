@@ -20,63 +20,63 @@ export AWS_SESSION_TOKEN=$(cat temp_credentials.json | jq -r '.Credentials.Sessi
 
 # Create or update parameters
 aws ssm put-parameter \
-    --name "/chat-genius/DATABASE_URL" \
+    --name "/chat-tensai/DATABASE_URL" \
     --value "$DATABASE_URL" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
+    --name "/chat-tensai/NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
     --value "$NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/CLERK_SECRET_KEY" \
+    --name "/chat-tensai/CLERK_SECRET_KEY" \
     --value "$CLERK_SECRET_KEY" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/NEXT_PUBLIC_SUPABASE_URL" \
+    --name "/chat-tensai/NEXT_PUBLIC_SUPABASE_URL" \
     --value "$NEXT_PUBLIC_SUPABASE_URL" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/NEXT_PUBLIC_SUPABASE_ANON_KEY" \
+    --name "/chat-tensai/NEXT_PUBLIC_SUPABASE_ANON_KEY" \
     --value "$NEXT_PUBLIC_SUPABASE_ANON_KEY" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/AWS_ACCESS_KEY_ID" \
+    --name "/chat-tensai/AWS_ACCESS_KEY_ID" \
     --value "$AWS_ACCESS_KEY_ID" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/AWS_SECRET_ACCESS_KEY" \
+    --name "/chat-tensai/AWS_SECRET_ACCESS_KEY" \
     --value "$AWS_SECRET_ACCESS_KEY" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/AWS_REGION" \
+    --name "/chat-tensai/AWS_REGION" \
     --value "us-east-1" \
     --type "SecureString" \
     --overwrite \
     --region us-east-1
 
 aws ssm put-parameter \
-    --name "/chat-genius/S3_BUCKET_NAME" \
+    --name "/chat-tensai/S3_BUCKET_NAME" \
     --value "$S3_BUCKET_NAME" \
     --type "SecureString" \
     --overwrite \

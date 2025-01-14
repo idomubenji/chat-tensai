@@ -44,7 +44,7 @@ const animeUsers = [
   {
     id: `${DEV_PREFIX}bot`,
     name: 'Chat Genius Bot (Dev)',
-    email: 'bot@chat-genius.local',
+    email: 'bot@chat-tensai.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const
@@ -52,7 +52,7 @@ const animeUsers = [
   {
     id: `${DEV_PREFIX}kawaii_neko`,
     name: 'Kawaii Neko-chan',
-    email: 'neko@chat-genius.local',
+    email: 'neko@chat-tensai.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const
@@ -60,7 +60,7 @@ const animeUsers = [
   {
     id: `${DEV_PREFIX}otaku_sensei`,
     name: 'Otaku Sensei',
-    email: 'sensei@chat-genius.local',
+    email: 'sensei@chat-tensai.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const
@@ -68,7 +68,7 @@ const animeUsers = [
   {
     id: `${DEV_PREFIX}moe_master`,
     name: 'Moe Master',
-    email: 'moe@chat-genius.local',
+    email: 'moe@chat-tensai.local',
     avatar_url: null,
     status: 'ONLINE' as const,
     role: 'USER' as const

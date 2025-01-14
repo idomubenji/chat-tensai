@@ -79,7 +79,7 @@ echo "Cleaning up dev dependencies..."
 npm prune --production
 
 echo "Starting application with PM2..."
-pm2 delete chat-genius 2>/dev/null || true
+pm2 delete chat-tensai 2>/dev/null || true
 
 # Clean up any existing .next cache with sudo
 echo "Cleaning up .next cache..."
@@ -98,7 +98,7 @@ pm2 save
 
 echo "Setup complete! Application should be running."
 echo "Check status with: pm2 list"
-echo "View logs with: pm2 logs chat-genius"
+echo "View logs with: pm2 logs chat-tensai"
 
 # Print current process status
 echo "Current PM2 processes:"
@@ -106,7 +106,7 @@ pm2 list
 
 # Print recent logs
 echo "Recent application logs:"
-pm2 logs chat-genius --lines 20 || true
+pm2 logs chat-tensai --lines 20 || true
 EOF
 
 chmod +x deploy/start.sh
@@ -119,15 +119,15 @@ echo "Deployment package created: deploy.tar.gz"
 echo ""
 echo "To deploy to EC2:"
 echo "1. Copy the package to EC2:"
-echo "   scp -i ~/.ssh/chat-genius-ec2.pem deploy.tar.gz ec2-user@44.200.83.77:~"
+echo "   scp -i ~/.ssh/chat-tensai-ec2.pem deploy.tar.gz ec2-user@44.200.83.77:~"
 echo ""
 echo "2. SSH into EC2:"
-echo "   ssh -i ~/.ssh/chat-genius-ec2.pem ec2-user@44.200.83.77"
+echo "   ssh -i ~/.ssh/chat-tensai-ec2.pem ec2-user@44.200.83.77"
 echo ""
 echo "3. Extract and deploy:"
 echo "   cd ~"
-echo "   rm -rf chat-genius"
-echo "   mkdir chat-genius"
-echo "   cd chat-genius"
+echo "   rm -rf chat-tensai"
+echo "   mkdir chat-tensai"
+echo "   cd chat-tensai"
 echo "   tar -xzf ../deploy.tar.gz"
 echo "   ./start.sh" 

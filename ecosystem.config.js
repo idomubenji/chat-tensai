@@ -1,6 +1,6 @@
 module.exports = {
   apps: [{
-    name: 'chat-genius',
+    name: 'chat-tensai',
     script: 'scripts/server.js',
     instances: 1,
     autorestart: true,

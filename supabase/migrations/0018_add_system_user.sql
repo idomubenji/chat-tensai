@@ -2,7 +2,7 @@
 INSERT INTO public.users (id, email, name, status, role)
 VALUES (
   'system',
-  'system@chat-genius.local',
+  'system@chat-tensai.local',
   'System',
   'ONLINE',
   'SYSTEM'

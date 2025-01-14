@@ -11,7 +11,7 @@
   },
   "generalRules": {
     "documentation": {
-      "referencePRD": "docs/chat-genius-prd.md",
+      "referencePRD": "docs/chat-tensai-prd.md",
       "style": "Use concise and clear descriptions for functions and components.",
       "requireDocstrings": true
     },
@@ -53,7 +53,7 @@
   "taskSpecificRules": {
     "codeGeneration": {
       "usePRD": true,
-      "instruction": "Always consult the PRD at 'docs/chat-genius-prd.md' for context when generating or modifying code. Ensure features match the described requirements. Let me know if you see an issue with this code before proceeding."
+      "instruction": "Always consult the PRD at 'docs/chat-tensai-prd.md' for context when generating or modifying code. Ensure features match the described requirements. Let me know if you see an issue with this code before proceeding."
     },
     "supabaseReset": {
       "workflow": [

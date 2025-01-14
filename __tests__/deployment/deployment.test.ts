@@ -10,7 +10,7 @@ dotenv.config({ path: path.resolve(process.cwd(), '.env.production') });
 
 const execAsync = promisify(exec);
 const EC2_IP = '44.200.83.77';
-const SSH_KEY_PATH = '~/.ssh/chat-genius-ec2.pem';
+const SSH_KEY_PATH = '~/.ssh/chat-tensai-ec2.pem';
 const EC2_USER = 'ec2-user';
 
 describe('Deployment Configuration', () => {
