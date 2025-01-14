@@ -11,6 +11,9 @@ node-installer/
 .nyc_output/
 *.test.results.json
 
+# Development Scripts
+/scripts/
+
 # Environment Variables and Secrets
 .env
 .env.*
