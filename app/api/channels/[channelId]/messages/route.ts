@@ -30,7 +30,14 @@ export async function GET(
     // Get URL parameters
     const { searchParams } = new URL(req.url);
     const before = searchParams.get('before');
-    const limit = parseInt(searchParams.get('limit') || '50');
+    const limit = Math.min(parseInt(searchParams.get('limit') || '50'), 50);
+
+    // Debug log for request parameters
+    console.log('Request parameters:', {
+      before: before ? new Date(before) : null,
+      limit,
+      channelId: params.channelId
+    });
 
     // Get messages with pagination
     const query = supabase
@@ -51,12 +58,25 @@ export async function GET(
       .limit(limit);
 
     if (before) {
-      query.lt('created_at', before);
+      try {
+        // Validate the timestamp
+        const beforeDate = new Date(before);
+        if (isNaN(beforeDate.getTime())) {
+          throw new Error('Invalid timestamp format');
+        }
+        query.lt('created_at', beforeDate.toISOString());
+      } catch (error) {
+        console.error('Error parsing before timestamp:', error);
+        return new NextResponse('Invalid timestamp format', { status: 400 });
+      }
     }
 
     const { data: messages, error: messagesError } = await query;
 
-    if (messagesError) throw messagesError;
+    if (messagesError) {
+      console.error('Error fetching messages:', messagesError);
+      throw messagesError;
+    }
 
     // Transform messages to include reply count and reverse to show oldest first
     const transformedMessages = messages?.map(message => ({
@@ -71,10 +91,14 @@ export async function GET(
       count: transformedMessages?.length,
       firstMessage: transformedMessages?.[0],
       error: messagesError,
+      params: {
+        before,
+        limit,
+        channelId: params.channelId
+      },
       replyCounts: transformedMessages?.map(m => ({
         messageId: m.id,
-        replyCount: m.replies?.count,
-        fullReplies: m.replies
+        replyCount: m.replies?.count
       }))
     });
 

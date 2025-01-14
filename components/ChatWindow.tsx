@@ -33,6 +33,7 @@ export function ChatWindow({
   const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { userId, user } = useSupabaseAuth();
   const isInitialLoadRef = useRef(true);
 
@@ -41,14 +42,14 @@ export function ChatWindow({
     if (!messages.length) return;
 
     if (isInitialLoadRef.current && !isLoading) {
-      // Initial load: instant scroll
+      // Initial load: instant scroll to bottom
       messagesEndRef.current?.scrollIntoView();
       isInitialLoadRef.current = false;
-    } else if (!isLoading) {
-      // New messages: smooth scroll
+    } else if (!isLoading && !isLoadingMore) {
+      // Only smooth scroll for new messages, not when loading older ones
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isLoading]);
+  }, [messages, isLoading, isLoadingMore]);
 
   const loadMoreMessages = async () => {
     if (isLoadingMore || !hasMoreMessages) return;
@@ -62,18 +63,31 @@ export function ChatWindow({
         return;
       }
 
-      const response = await fetch(`/api/channels/${channelId}/messages?before=${oldestMessage.created_at}`);
+      // Store current scroll position and height
+      const container = messagesContainerRef.current;
+      const oldScrollHeight = container?.scrollHeight || 0;
+      const oldScrollTop = container?.scrollTop || 0;
+
+      const response = await fetch(
+        `/api/channels/${channelId}/messages?before=${encodeURIComponent(oldestMessage.created_at)}&limit=50`
+      );
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch more messages');
+        throw new Error(`Failed to fetch more messages: ${response.status}`);
       }
+      
       const olderMessages = await response.json();
+      
+      if (!Array.isArray(olderMessages)) {
+        throw new Error('Invalid response format: expected an array of messages');
+      }
       
       if (olderMessages.length === 0) {
         setHasMoreMessages(false);
         return;
       }
 
-      // If we got less than 50 messages, there are no more to load
+      // If we got less than the requested limit, there are no more messages
       if (olderMessages.length < 50) {
         setHasMoreMessages(false);
       }
@@ -111,10 +125,33 @@ export function ChatWindow({
         }
       }));
 
+      // Debug log
+      console.log('Loaded older messages:', {
+        count: transformedMessages.length,
+        firstMessage: transformedMessages[0],
+        lastMessage: transformedMessages[transformedMessages.length - 1]
+      });
+
       // Add the older messages before the existing ones
-      setMessages(prev => [...transformedMessages, ...prev]);
+      setMessages(prev => {
+        // Ensure no duplicate messages
+        const existingIds = new Set(prev.map(msg => msg.id));
+        const uniqueNewMessages = transformedMessages.filter(msg => !existingIds.has(msg.id));
+        return [...uniqueNewMessages, ...prev];
+      });
+
+      // Restore scroll position after messages are added
+      requestAnimationFrame(() => {
+        if (container) {
+          const newScrollHeight = container.scrollHeight;
+          const scrollDiff = newScrollHeight - oldScrollHeight;
+          container.scrollTop = oldScrollTop + scrollDiff;
+        }
+      });
     } catch (error) {
       console.error('Error loading more messages:', error);
+      // Keep the hasMoreMessages flag true so user can retry
+      setHasMoreMessages(true);
     } finally {
       setIsLoadingMore(false);
     }
@@ -519,7 +556,10 @@ export function ChatWindow({
 
   return (
     <div className="flex flex-col h-full bg-[#F5E6D3]">
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div 
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4"
+      >
         {hasMoreMessages && (
           <div className="flex justify-center mb-4">
             <Button
@@ -534,11 +574,6 @@ export function ChatWindow({
         )}
         {messages.map((message) => {
           const isCurrentUser = message.user_id === userId;
-          console.log('Message replies:', {
-            messageId: message.id,
-            replyCount: message.replies?.count,
-            fullReplies: message.replies
-          });
 
           return (
             <div
