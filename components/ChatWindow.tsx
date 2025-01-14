@@ -36,6 +36,30 @@ export function ChatWindow({
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { userId, user } = useSupabaseAuth();
   const isInitialLoadRef = useRef(true);
+  const isNearBottomRef = useRef(true);
+
+  // Check if user is near bottom of chat
+  const checkIfNearBottom = useCallback(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return true;
+
+    const threshold = 100; // pixels from bottom to consider "near bottom"
+    const position = container.scrollHeight - container.scrollTop - container.clientHeight;
+    return position < threshold;
+  }, []);
+
+  // Update isNearBottomRef when user scrolls
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+
+    const handleScroll = () => {
+      isNearBottomRef.current = checkIfNearBottom();
+    };
+
+    container.addEventListener('scroll', handleScroll);
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, [checkIfNearBottom]);
 
   // Handle scrolling behavior
   useEffect(() => {
@@ -46,10 +70,13 @@ export function ChatWindow({
       messagesEndRef.current?.scrollIntoView();
       isInitialLoadRef.current = false;
     } else if (!isLoading && !isLoadingMore) {
-      // Only smooth scroll for new messages, not when loading older ones
-      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      // Only scroll for own messages
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.user_id === userId) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-  }, [messages, isLoading, isLoadingMore]);
+  }, [messages, isLoading, isLoadingMore, userId]);
 
   const loadMoreMessages = async () => {
     if (isLoadingMore || !hasMoreMessages) return;
@@ -412,9 +439,6 @@ export function ChatWindow({
         }
         const messages = await response.json();
         
-        // Debug log
-        console.log('Raw messages:', messages);
-        
         // Transform the messages to match our expected format
         const transformedMessages = messages.map((msg: any) => ({
           id: msg.id,
@@ -448,13 +472,6 @@ export function ChatWindow({
           }
         }));
 
-        // Debug log
-        console.log('Transformed messages:', {
-          count: transformedMessages.length,
-          firstMessage: transformedMessages[0],
-          replyCount: transformedMessages[0]?.replies?.count
-        });
-
         setMessages(transformedMessages);
       } catch (error) {
         console.error('Error fetching messages:', error);
@@ -477,8 +494,7 @@ export function ChatWindow({
           table: 'messages',
           filter: `channel_id=eq.${channelId}`,
         },
-        async () => {
-          // Don't show loading state for real-time updates
+        async (payload) => {
           try {
             const response = await fetch(`/api/channels/${channelId}/messages`);
             if (!response.ok) {
@@ -518,15 +534,26 @@ export function ChatWindow({
               }
             }));
 
-            // Debug log for real-time updates
-            console.log('Real-time transformed messages:', {
-              count: transformedMessages.length,
-              firstMessage: transformedMessages[0],
-              replyCount: transformedMessages[0]?.replies?.count
-            });
+            // Store current scroll position before updating messages
+            const container = messagesContainerRef.current;
+            const wasAtBottom = isNearBottomRef.current;
+            const oldScrollHeight = container?.scrollHeight || 0;
+            const oldScrollTop = container?.scrollTop || 0;
 
-            // Remove any optimistic messages when setting new messages
+            // Update messages
             setMessages(transformedMessages);
+
+            // After messages update, restore scroll position if needed
+            requestAnimationFrame(() => {
+              if (container) {
+                if (!wasAtBottom) {
+                  // If user was scrolled up, maintain relative position
+                  const newScrollHeight = container.scrollHeight;
+                  const scrollDiff = newScrollHeight - oldScrollHeight;
+                  container.scrollTop = oldScrollTop + scrollDiff;
+                }
+              }
+            });
           } catch (error) {
             console.error('Error fetching messages:', error);
           }
