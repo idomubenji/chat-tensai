@@ -433,11 +433,17 @@ export function ChatWindow({
     const fetchMessages = async () => {
       try {
         setIsLoading(true);
+        setHasMoreMessages(true); // Reset on channel change
         const response = await fetch(`/api/channels/${channelId}/messages`);
         if (!response.ok) {
           throw new Error('Failed to fetch messages');
         }
         const messages = await response.json();
+        
+        // If we got less than the page size on initial load, there are no more messages
+        if (messages.length < 50) {
+          setHasMoreMessages(false);
+        }
         
         // Transform the messages to match our expected format
         const transformedMessages = messages.map((msg: any) => ({
