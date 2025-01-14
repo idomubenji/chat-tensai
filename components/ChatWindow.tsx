@@ -55,9 +55,14 @@ export function ChatWindow({
     
     try {
       setIsLoadingMore(true);
-      const oldestMessageId = messages[0]?.id;
-      const oldestTimestamp = messages[0]?.created_at;
-      const response = await fetch(`/api/channels/${channelId}/messages?before=${oldestTimestamp}`);
+      // Get the oldest message's timestamp for pagination
+      const oldestMessage = messages[0];
+      if (!oldestMessage?.created_at) {
+        setHasMoreMessages(false);
+        return;
+      }
+
+      const response = await fetch(`/api/channels/${channelId}/messages?before=${oldestMessage.created_at}`);
       if (!response.ok) {
         throw new Error('Failed to fetch more messages');
       }
@@ -66,6 +71,11 @@ export function ChatWindow({
       if (olderMessages.length === 0) {
         setHasMoreMessages(false);
         return;
+      }
+
+      // If we got less than 50 messages, there are no more to load
+      if (olderMessages.length < 50) {
+        setHasMoreMessages(false);
       }
 
       // Transform messages like in the original fetch
@@ -101,6 +111,7 @@ export function ChatWindow({
         }
       }));
 
+      // Add the older messages before the existing ones
       setMessages(prev => [...transformedMessages, ...prev]);
     } catch (error) {
       console.error('Error loading more messages:', error);

@@ -84,5 +84,7 @@ build/
 .vercel
 .env*.local
 .backup/
+
+# Testing
 .jest/
 __tests__/
