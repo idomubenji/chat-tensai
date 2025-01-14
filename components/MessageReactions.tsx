@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Button } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Button } from '@/components/ui/button';
 import { Smile } from 'lucide-react';
 import data from '@emoji-mart/data';
 import Picker from '@emoji-mart/react';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { useToast } from "@/components/ui/use-toast";
-import { cn } from "@/lib/utils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { useToast } from '@/components/ui/use-toast';
+import { cn } from '@/lib/utils';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/supabase';
 
@@ -101,9 +101,9 @@ export function MessageReactions({
       // Revert optimistic update on error
       setOptimisticReactions(reactions);
       toast({
-        title: "Error",
-        description: "Failed to update reaction. Please try again.",
-        variant: "destructive"
+        title: 'Error',
+        description: 'Failed to update reaction. Please try again.',
+        variant: 'destructive'
       });
     }
   };
@@ -123,9 +123,9 @@ export function MessageReactions({
               <button
                 onClick={() => handleEmojiSelect({ native: emoji })}
                 className={cn(
-                  "inline-flex items-center gap-1 px-2 py-1 rounded text-sm",
-                  "border-2 border-black hover:bg-white/50 transition-colors",
-                  reaction.userIds.includes(currentUserId) && "bg-white/50"
+                  'inline-flex items-center gap-1 px-2 py-1 rounded text-sm',
+                  'border-2 border-black hover:bg-white/50 transition-colors',
+                  reaction.userIds.includes(currentUserId) && 'bg-white/50'
                 )}
               >
                 <span>{emoji}</span>

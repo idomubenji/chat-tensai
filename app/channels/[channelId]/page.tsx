@@ -1,14 +1,14 @@
-"use client";
+'use client';
 
-import { useEffect, useState, useCallback } from "react";
-import { ChatWindow } from "@/components/ChatWindow";
-import { useRouter } from "next/navigation";
-import { cn } from "@/lib/utils";
-import { ThreadWindow } from "@/components/ThreadWindow";
-import { LoadingBall } from "@/components/ui/loading";
-import { TopBar } from "@/components/TopBar";
-import { Sidebar } from "@/components/Sidebar";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { useEffect, useState, useCallback } from 'react';
+import { ChatWindow } from '@/components/ChatWindow';
+import { useRouter } from 'next/navigation';
+import { cn } from '@/lib/utils';
+import { ThreadWindow } from '@/components/ThreadWindow';
+import { LoadingBall } from '@/components/ui/loading';
+import { TopBar } from '@/components/TopBar';
+import { Sidebar } from '@/components/Sidebar';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 
 export default function ChannelPage({ params }: { params: { channelId: string } }) {
   const { isLoaded, userId } = useSupabaseAuth();
@@ -46,8 +46,8 @@ export default function ChannelPage({ params }: { params: { channelId: string } 
         <TopBar />
         <div className="flex-1 flex overflow-hidden bg-[#F5E6D3]">
           <div className={cn(
-            "flex-1 flex flex-col",
-            selectedMessageId && "lg:border-r border-gray-200"
+            'flex-1 flex flex-col',
+            selectedMessageId && 'lg:border-r border-gray-200'
           )}>
             <ChatWindow
               channelId={params.channelId}

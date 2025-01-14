@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useRouter } from 'next/navigation';
 import { useChannels } from '@/hooks/useChannels';
@@ -9,7 +9,7 @@ import {
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
+} from '@/components/ui/accordion';
 import { Button } from '@/components/ui/button';
 import { MessageSquare } from 'lucide-react';
 import { ProfilePicture } from '@/components/ProfilePicture';

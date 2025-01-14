@@ -1,6 +1,6 @@
-import { Input } from "@/components/ui/input"
-import { Button } from "@/components/ui/button"
-import { Search } from 'lucide-react'
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Search } from 'lucide-react';
 
 export function TopBar() {
   return (
@@ -12,6 +12,6 @@ export function TopBar() {
         </Button>
       </div>
     </div>
-  )
+  );
 }
 

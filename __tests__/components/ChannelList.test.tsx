@@ -70,7 +70,7 @@ describe('ChannelList', () => {
     const submitButton = screen.getByText('Create Channel');
     fireEvent.click(submitButton);
 
-    expect(screen.getByText("hey, there's nothing in the text box, don't you try and get away with that")).toBeInTheDocument();
+    expect(screen.getByText('hey, there\'s nothing in the text box, don\'t you try and get away with that')).toBeInTheDocument();
   });
 
   it('shows error when trying to add duplicate channel name', () => {

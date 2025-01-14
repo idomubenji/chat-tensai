@@ -1,4 +1,4 @@
-import * as React from "react"
+import * as React from 'react';
 import {
   Toast,
   ToastClose,
@@ -7,8 +7,8 @@ import {
   ToastTitle,
   ToastViewport,
   type ToastActionElement,
-} from "@/components/ui/toast"
-import { useToast } from "@/components/ui/use-toast"
+} from '@/components/ui/toast';
+import { useToast } from '@/components/ui/use-toast';
 
 interface Toast {
   id: string
@@ -19,7 +19,7 @@ interface Toast {
 }
 
 export function Toaster() {
-  const { toasts } = useToast()
+  const { toasts } = useToast();
 
   return (
     <ToastProvider>
@@ -35,9 +35,9 @@ export function Toaster() {
             {action}
             <ToastClose />
           </Toast>
-        )
+        );
       })}
       <ToastViewport />
     </ToastProvider>
-  )
+  );
 } 

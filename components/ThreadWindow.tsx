@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Send, X } from "lucide-react";
-import { MessageReactions } from "./MessageReactions";
-import { MessageReplyButton } from "./MessageReplyButton";
-import { cn } from "@/lib/utils";
-import { UserName } from "./UserName";
-import { ProfilePicture } from "./ProfilePicture";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Send, X } from 'lucide-react';
+import { MessageReactions } from './MessageReactions';
+import { MessageReplyButton } from './MessageReplyButton';
+import { cn } from '@/lib/utils';
+import { UserName } from './UserName';
+import { ProfilePicture } from './ProfilePicture';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/supabase';
 import type { Message } from '@/types/message';
@@ -23,7 +23,7 @@ export function ThreadWindow({
   onClose,
 }: ThreadWindowProps) {
   const [replyingTo, setReplyingTo] = useState<Message | null>(null);
-  const [newMessage, setNewMessage] = useState("");
+  const [newMessage, setNewMessage] = useState('');
   const [parentMessage, setParentMessage] = useState<Message | null>(null);
   const [replies, setReplies] = useState<Message[]>([]);
   const { userId } = useSupabaseAuth();
@@ -491,13 +491,13 @@ export function ThreadWindow({
       <div
         key={message.id}
         className={cn(
-          "group flex flex-col gap-1",
-          isCurrentUser ? "items-end" : "items-start",
-          isParent && "border-b pb-4 mb-4"
+          'group flex flex-col gap-1',
+          isCurrentUser ? 'items-end' : 'items-start',
+          isParent && 'border-b pb-4 mb-4'
         )}
       >
-        <div className={cn("flex items-start gap-2 w-full", isCurrentUser ? "flex-row-reverse justify-start" : "flex-row")}>
-          <div className={cn("flex flex-col min-w-0 max-w-[calc(100%-3rem)]", isCurrentUser ? "items-end" : "items-start")}>
+        <div className={cn('flex items-start gap-2 w-full', isCurrentUser ? 'flex-row-reverse justify-start' : 'flex-row')}>
+          <div className={cn('flex flex-col min-w-0 max-w-[calc(100%-3rem)]', isCurrentUser ? 'items-end' : 'items-start')}>
             <div className="flex items-center gap-2">
               {isCurrentUser ? (
                 <>
@@ -525,23 +525,23 @@ export function ThreadWindow({
             </div>
             <div className="flex flex-col gap-1">
               <div className={cn(
-                "flex items-start gap-2",
-                isCurrentUser && "flex-row-reverse"
+                'flex items-start gap-2',
+                isCurrentUser && 'flex-row-reverse'
               )}>
                 <div className="w-8 h-8 flex-shrink-0">
                   <ProfilePicture
                     size="default"
-                    borderColor={isCurrentUser ? "black" : "white"}
+                    borderColor={isCurrentUser ? 'black' : 'white'}
                     borderWidth="thin"
                     avatarUrl={message.user.avatar_url}
                   />
                 </div>
                 <div
                   className={cn(
-                    "rounded-lg px-4 py-2 text-sm break-words",
+                    'rounded-lg px-4 py-2 text-sm break-words',
                     isCurrentUser
-                      ? "bg-pink-200 text-gray-900"
-                      : "bg-[#223344] text-white"
+                      ? 'bg-pink-200 text-gray-900'
+                      : 'bg-[#223344] text-white'
                   )}
                 >
                   {message.content}
@@ -551,7 +551,7 @@ export function ThreadWindow({
                     messageId={message.id}
                     currentUserId={userId || ''}
                     onReactionSelect={handleReactionSelect}
-                    align={isCurrentUser ? "start" : "end"}
+                    align={isCurrentUser ? 'start' : 'end'}
                     reactions={message.reactions}
                     showButton
                   />
@@ -559,14 +559,14 @@ export function ThreadWindow({
               </div>
               {Object.keys(message.reactions).length > 0 && (
                 <div className={cn(
-                  "flex flex-wrap gap-1 mt-1",
-                  isCurrentUser ? "pr-12" : "pl-12"
+                  'flex flex-wrap gap-1 mt-1',
+                  isCurrentUser ? 'pr-12' : 'pl-12'
                 )}>
                   <MessageReactions
                     messageId={message.id}
                     currentUserId={userId || ''}
                     onReactionSelect={handleReactionSelect}
-                    align={isCurrentUser ? "start" : "end"}
+                    align={isCurrentUser ? 'start' : 'end'}
                     reactions={message.reactions}
                   />
                 </div>
@@ -576,7 +576,7 @@ export function ThreadWindow({
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="flex flex-col h-full w-full bg-[#D5C6B3] border-l-2 border-l-black">

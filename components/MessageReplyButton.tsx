@@ -1,5 +1,5 @@
-import { Button } from "@/components/ui/button";
-import { MessageSquareShare } from "lucide-react";
+import { Button } from '@/components/ui/button';
+import { MessageSquareShare } from 'lucide-react';
 
 interface MessageReplyButtonProps {
   onClick: () => void;

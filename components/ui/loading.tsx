@@ -1,10 +1,10 @@
 'use client';
 
-import { cn } from "@/lib/utils";
+import { cn } from '@/lib/utils';
 
 export function LoadingBall({ className }: { className?: string }) {
   return (
-    <div className={cn("flex items-center justify-center h-full w-full", className)}>
+    <div className={cn('flex items-center justify-center h-full w-full', className)}>
       <div className="relative w-16 h-16">
         {/* Outer glow effect */}
         <div className="absolute -inset-4 bg-gradient-to-r from-yellow-300/20 to-purple-600/20 rounded-full blur-xl animate-pulse" />

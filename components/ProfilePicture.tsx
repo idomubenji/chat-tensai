@@ -64,9 +64,9 @@ export function ProfilePicture({
   const sizeClass = typeof size === 'string' ? sizeClasses[size] : `w-[${size}px] h-[${size}px]`;
 
   return (
-    <div className={cn("relative", sizeClass, className)}>
+    <div className={cn('relative', sizeClass, className)}>
       <div className={cn(
-        "absolute inset-0 rounded-full z-10 border",
+        'absolute inset-0 rounded-full z-10 border',
         borderClasses[borderColor],
         borderWidthClasses[borderWidth]
       )} />

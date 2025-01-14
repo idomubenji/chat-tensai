@@ -6,11 +6,11 @@ import { createContext, useContext, useEffect, useState } from 'react';
 import type { User } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/supabase';
 
-type AuthContextType = {
+interface AuthContextType {
   user: User | null;
   isLoading: boolean;
   error: Error | null;
-};
+}
 
 const AuthContext = createContext<AuthContextType>({
   user: null,

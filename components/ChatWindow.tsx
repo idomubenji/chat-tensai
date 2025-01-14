@@ -1,18 +1,18 @@
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Send, Smile } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { cn } from "@/lib/utils";
-import { MessageReactions } from "./MessageReactions";
-import { MessageReplyButton } from "./MessageReplyButton";
-import { ThreadWindow } from "./ThreadWindow";
-import { LoadingBall } from "./LoadingBall";
-import { UserName } from "./UserName";
-import { ProfilePicture } from "./ProfilePicture";
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
-import type { Database } from "@/types/supabase";
-import type { Message } from "@/types/message";
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { Send, Smile } from 'lucide-react';
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { cn } from '@/lib/utils';
+import { MessageReactions } from './MessageReactions';
+import { MessageReplyButton } from './MessageReplyButton';
+import { ThreadWindow } from './ThreadWindow';
+import { LoadingBall } from './LoadingBall';
+import { UserName } from './UserName';
+import { ProfilePicture } from './ProfilePicture';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Database } from '@/types/supabase';
+import type { Message } from '@/types/message';
 import type { RealtimePostgresChangesPayload } from '@supabase/supabase-js';
 
 interface ChatWindowProps {
@@ -26,7 +26,7 @@ export function ChatWindow({
   onMessageSelect,
   selectedMessageId,
 }: ChatWindowProps) {
-  const [newMessage, setNewMessage] = useState("");
+  const [newMessage, setNewMessage] = useState('');
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -44,7 +44,7 @@ export function ChatWindow({
   }, [isLoading]);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -82,7 +82,7 @@ export function ChatWindow({
 
     // Add optimistic message immediately
     setMessages(prev => [...prev, optimisticMessage]);
-    setNewMessage(""); // Clear input after sending
+    setNewMessage(''); // Clear input after sending
 
     try {
       const response = await fetch(`/api/channels/${channelId}/messages`, {
@@ -427,11 +427,11 @@ export function ChatWindow({
     return (
       <div className="flex items-center justify-center h-full bg-[#F5E6D3]">
         <div className={cn(
-          "w-12 h-12 rounded-full",
-          "bg-gradient-to-r from-yellow-300 to-purple-500",
-          "shadow-[0_0_20px_rgba(252,211,77,0.7)]",
-          "animate-glow",
-          isTransitioning ? "animate-fade-out" : "animate-fade-in"
+          'w-12 h-12 rounded-full',
+          'bg-gradient-to-r from-yellow-300 to-purple-500',
+          'shadow-[0_0_20px_rgba(252,211,77,0.7)]',
+          'animate-glow',
+          isTransitioning ? 'animate-fade-out' : 'animate-fade-in'
         )} />
       </div>
     );
@@ -452,13 +452,13 @@ export function ChatWindow({
             <div
               key={message.id}
               className={cn(
-                "group flex flex-col gap-1 w-full",
-                isCurrentUser ? "items-end" : "items-start"
+                'group flex flex-col gap-1 w-full',
+                isCurrentUser ? 'items-end' : 'items-start'
               )}
             >
               <div className={cn(
-                "flex flex-col max-w-[70%]",
-                isCurrentUser ? "items-end" : "items-start"
+                'flex flex-col max-w-[70%]',
+                isCurrentUser ? 'items-end' : 'items-start'
               )}>
                 <div className="flex items-center gap-2 mb-1">
                   {isCurrentUser ? (
@@ -486,42 +486,42 @@ export function ChatWindow({
                   )}
                 </div>
                 <div className={cn(
-                  "flex items-start gap-2",
-                  isCurrentUser && "flex-row-reverse"
+                  'flex items-start gap-2',
+                  isCurrentUser && 'flex-row-reverse'
                 )}>
                   <div className="w-8 h-8 flex-shrink-0">
                     <ProfilePicture
                       size="default"
-                      borderColor={isCurrentUser ? "black" : "white"}
+                      borderColor={isCurrentUser ? 'black' : 'white'}
                       borderWidth="thin"
                       avatarUrl={message.user.avatar_url}
                     />
                   </div>
                   <div
                     className={cn(
-                      "rounded-lg px-4 py-2 text-sm break-words",
+                      'rounded-lg px-4 py-2 text-sm break-words',
                       isCurrentUser
-                        ? "bg-pink-200 text-gray-900"
-                        : "bg-[#223344] text-white"
+                        ? 'bg-pink-200 text-gray-900'
+                        : 'bg-[#223344] text-white'
                     )}
                   >
                     {message.content}
                   </div>
                   <div className={cn(
-                    "flex items-center gap-1",
-                    isCurrentUser && "flex-row-reverse"
+                    'flex items-center gap-1',
+                    isCurrentUser && 'flex-row-reverse'
                   )}>
                     <MessageReactions
                       messageId={message.id}
                       currentUserId={userId || ''}
                       onReactionSelect={handleReactionSelect}
-                      align={isCurrentUser ? "start" : "end"}
+                      align={isCurrentUser ? 'start' : 'end'}
                       reactions={message.reactions}
                       showButton
                     />
                     <MessageReplyButton
                       onClick={() => handleSelectMessage(message)}
-                      align={isCurrentUser ? "start" : "end"}
+                      align={isCurrentUser ? 'start' : 'end'}
                     />
                   </div>
                 </div>
@@ -529,8 +529,8 @@ export function ChatWindow({
                   <div
                     onClick={() => handleSelectMessage(message)}
                     className={cn(
-                      "text-sm text-blue-500 hover:underline cursor-pointer mt-1",
-                      isCurrentUser ? "pr-12" : "pl-12"
+                      'text-sm text-blue-500 hover:underline cursor-pointer mt-1',
+                      isCurrentUser ? 'pr-12' : 'pl-12'
                     )}
                   >
                     {message.replies.count} {message.replies.count === 1 ? 'reply' : 'replies'}
@@ -538,14 +538,14 @@ export function ChatWindow({
                 )}
                 {Object.keys(message.reactions).length > 0 && (
                   <div className={cn(
-                    "flex flex-wrap gap-1 mt-1",
-                    isCurrentUser ? "pr-12" : "pl-12"
+                    'flex flex-wrap gap-1 mt-1',
+                    isCurrentUser ? 'pr-12' : 'pl-12'
                   )}>
                     <MessageReactions
                       messageId={message.id}
                       currentUserId={userId || ''}
                       onReactionSelect={handleReactionSelect}
-                      align={isCurrentUser ? "start" : "end"}
+                      align={isCurrentUser ? 'start' : 'end'}
                       reactions={message.reactions}
                     />
                   </div>

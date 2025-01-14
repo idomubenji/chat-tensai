@@ -1,23 +1,23 @@
-"use client";
+'use client';
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { useRouter } from "next/navigation";
-import { LoadingBall } from "@/components/ui/loading";
-import { Sidebar } from "@/components/Sidebar";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Label } from "@/components/ui/label";
-import { EmojiPicker } from "@/components/EmojiPicker";
-import { PersonalCard } from "@/components/PersonalCard";
-import { AvatarUpload } from "@/components/AvatarUpload";
-import { useToast } from "@/components/ui/use-toast";
-import { Toaster } from "@/components/ui/toaster";
+import { useState, useEffect } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useRouter } from 'next/navigation';
+import { LoadingBall } from '@/components/ui/loading';
+import { Sidebar } from '@/components/Sidebar';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from '@/components/ui/alert-dialog';
+import { Label } from '@/components/ui/label';
+import { EmojiPicker } from '@/components/EmojiPicker';
+import { PersonalCard } from '@/components/PersonalCard';
+import { AvatarUpload } from '@/components/AvatarUpload';
+import { useToast } from '@/components/ui/use-toast';
+import { Toaster } from '@/components/ui/toaster';
 import { mutate } from 'swr';
 import { USER_DATA_KEY } from '@/components/PersonalCard';
-import { createClientComponentClient } from "@supabase/auth-helpers-nextjs";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 interface UserSettings {
   bio: string;
@@ -32,11 +32,11 @@ export default function SettingsPage() {
   const router = useRouter();
   const { toast } = useToast();
   const [settings, setSettings] = useState<UserSettings>({
-    bio: "",
-    status_message: "",
-    status_emoji: "",
+    bio: '',
+    status_message: '',
+    status_emoji: '',
     avatar_url: null,
-    username: "",
+    username: '',
   });
   const [isSaving, setIsSaving] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -54,18 +54,18 @@ export default function SettingsPage() {
         if (!response.ok) throw new Error('Failed to fetch user settings');
         const data = await response.json();
         setSettings({
-          bio: data.bio || "",
-          status_message: data.status_message || "",
-          status_emoji: data.status_emoji || "",
+          bio: data.bio || '',
+          status_message: data.status_message || '',
+          status_emoji: data.status_emoji || '',
           avatar_url: data.avatar_url,
-          username: data.name || user?.user_metadata?.username || "",
+          username: data.name || user?.user_metadata?.username || '',
         });
       } catch (error) {
         console.error('Error fetching user settings:', error);
         toast({
-          variant: "destructive",
-          title: "Error",
-          description: "Failed to load settings. Please try refreshing the page.",
+          variant: 'destructive',
+          title: 'Error',
+          description: 'Failed to load settings. Please try refreshing the page.',
         });
       }
     };
@@ -106,11 +106,11 @@ export default function SettingsPage() {
       // Update local state with the response data
       setSettings(prevSettings => ({
         ...prevSettings,
-        bio: updatedData.bio || "",
-        status_message: updatedData.status_message || "",
-        status_emoji: updatedData.status_emoji || "",
+        bio: updatedData.bio || '',
+        status_message: updatedData.status_message || '',
+        status_emoji: updatedData.status_emoji || '',
         avatar_url: updatedData.avatar_url,
-        username: updatedData.name || "",
+        username: updatedData.name || '',
       }));
       
       // Trigger revalidation of the user data
@@ -144,9 +144,9 @@ export default function SettingsPage() {
     } catch (error) {
       console.error('Error deleting account:', error);
       toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete account. Please try again.",
+        variant: 'destructive',
+        title: 'Error',
+        description: 'Failed to delete account. Please try again.',
       });
     } finally {
       setIsDeleting(false);
@@ -234,7 +234,7 @@ export default function SettingsPage() {
                       className="bg-red-500 hover:bg-red-600"
                       disabled={isDeleting}
                     >
-                      {isDeleting ? "Deleting..." : "Delete Account"}
+                      {isDeleting ? 'Deleting...' : 'Delete Account'}
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
@@ -245,7 +245,7 @@ export default function SettingsPage() {
                 disabled={isSaving}
                 className="bg-[#6F8FAF] hover:bg-[#5A7593]"
               >
-                {isSaving ? "Saving..." : "Save Changes"}
+                {isSaving ? 'Saving...' : 'Save Changes'}
               </Button>
             </div>
           </div>

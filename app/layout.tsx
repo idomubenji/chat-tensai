@@ -1,13 +1,13 @@
-import { SupabaseProvider } from "@/components/providers/SupabaseProvider";
-import { Inter } from "next/font/google";
-import { Metadata } from "next";
-import "./globals.css";
+import { SupabaseProvider } from '@/components/providers/SupabaseProvider';
+import { Inter } from 'next/font/google';
+import { Metadata } from 'next';
+import './globals.css';
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = Inter({ subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: "Slack-like Messaging App",
-  description: "A simple Slack-like messaging application",
+  title: 'Slack-like Messaging App',
+  description: 'A simple Slack-like messaging application',
 };
 
 export default function RootLayout({

@@ -1,11 +1,11 @@
-"use client";
+'use client';
 
-import { useEffect, useState } from "react";
-import { TopBar } from "@/components/TopBar";
-import { useSupabaseAuth } from "@/hooks/useSupabaseAuth";
-import { useRouter } from "next/navigation";
-import { LoadingBall } from "@/components/ui/loading";
-import { Sidebar } from "@/components/Sidebar";
+import { useEffect, useState } from 'react';
+import { TopBar } from '@/components/TopBar';
+import { useSupabaseAuth } from '@/hooks/useSupabaseAuth';
+import { useRouter } from 'next/navigation';
+import { LoadingBall } from '@/components/ui/loading';
+import { Sidebar } from '@/components/Sidebar';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Database } from '@/types/supabase';
 

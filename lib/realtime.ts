@@ -9,10 +9,10 @@ export type RealtimeMessage = Message & {
   user: User;
 };
 
-export type RealtimePresenceState = {
+export interface RealtimePresenceState {
   user_id: string;
   online_at: string;
-};
+}
 
 type RealtimeCallback<T extends { [key: string]: any }> = (payload: RealtimePostgresChangesPayload<T>) => void;
 
