@@ -88,6 +88,7 @@ export default function SettingsPage() {
           status_message: settings.status_message,
           status_emoji: settings.status_emoji,
           name: settings.username,
+          avatar_url: settings.avatar_url,
         }),
       });
 
@@ -106,15 +107,11 @@ export default function SettingsPage() {
       // Update local state with the response data
       setSettings(prevSettings => ({
         ...prevSettings,
-        bio: updatedData.bio || '',
-        status_message: updatedData.status_message || '',
-        status_emoji: updatedData.status_emoji || '',
-        avatar_url: updatedData.avatar_url,
-        username: updatedData.name || '',
+        ...updatedData,
       }));
       
       // Trigger revalidation of the user data
-      await mutate(USER_DATA_KEY, updatedData, false);
+      await mutate(USER_DATA_KEY);
       
       toast({
         title: 'Settings saved!',

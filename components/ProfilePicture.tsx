@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { cn } from '@/lib/utils';
+import { useAvatarUrl } from '@/hooks/useAvatarUrl';
 
 interface ProfilePictureProps {
   avatarUrl: string | null;
@@ -32,36 +33,18 @@ export function ProfilePicture({
   borderColor = 'white',
   borderWidth = 'thick'
 }: ProfilePictureProps) {
-  const [finalAvatarUrl, setFinalAvatarUrl] = useState<string>('/default-avatar.png');
-
-  useEffect(() => {
-    async function getSignedUrl() {
-      if (!avatarUrl) {
-        setFinalAvatarUrl('/default-avatar.jpeg');
-        return;
-      }
-
-      if (!avatarUrl.startsWith('avatars/')) {
-        setFinalAvatarUrl(avatarUrl);
-        return;
-      }
-
-      try {
-        const response = await fetch(`/api/s3-url?key=${encodeURIComponent(avatarUrl)}`);
-        if (!response.ok) throw new Error('Failed to get signed URL');
-        const data = await response.json();
-        setFinalAvatarUrl(data.url);
-      } catch (error) {
-        console.error('Error getting signed URL:', error);
-        setFinalAvatarUrl('/default-avatar.jpeg');
-      }
-    }
-
-    getSignedUrl();
-  }, [avatarUrl]);
+  const { url: resolvedAvatarUrl, isLoading } = useAvatarUrl(avatarUrl);
 
   const sizeValue = typeof size === 'number' ? size : undefined;
   const sizeClass = typeof size === 'string' ? sizeClasses[size] : `w-[${size}px] h-[${size}px]`;
+
+  if (isLoading) {
+    return (
+      <div className={cn('relative', sizeClass, className)}>
+        <div className="absolute inset-0 bg-gray-200 animate-pulse rounded-full" />
+      </div>
+    );
+  }
 
   return (
     <div className={cn('relative', sizeClass, className)}>
@@ -72,7 +55,7 @@ export function ProfilePicture({
       )} />
       <div className="relative w-full h-full">
         <Image
-          src={finalAvatarUrl}
+          src={resolvedAvatarUrl || '/default-avatar.jpeg'}
           alt="Profile picture"
           fill
           sizes={typeof size === 'string' ? (size === 'large' ? '192px' : '48px') : `${size}px`}

@@ -3,6 +3,8 @@ import { useDropzone } from 'react-dropzone';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Upload } from 'lucide-react';
+import { useAvatarUrl } from '@/hooks/useAvatarUrl';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface AvatarUploadProps {
   onUpload: (url: string) => void;
@@ -12,6 +14,7 @@ interface AvatarUploadProps {
 export function AvatarUpload({ onUpload, currentAvatarUrl }: AvatarUploadProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { url: resolvedAvatarUrl, isLoading } = useAvatarUrl(currentAvatarUrl);
 
   const onDrop = useCallback(async (acceptedFiles: File[]) => {
     const file = acceptedFiles[0];
@@ -74,10 +77,14 @@ export function AvatarUpload({ onUpload, currentAvatarUrl }: AvatarUploadProps) 
         `}
       >
         <input {...getInputProps()} />
-        {currentAvatarUrl && (
+        {isLoading ? (
+          <div className="mb-4 mx-auto w-24 h-24">
+            <Skeleton className="w-full h-full rounded-full" />
+          </div>
+        ) : resolvedAvatarUrl && (
           <div className="mb-4 mx-auto w-24 h-24 relative overflow-hidden rounded-full">
             <img
-              src={currentAvatarUrl}
+              src={resolvedAvatarUrl}
               alt="Current avatar"
               className="object-cover w-full h-full"
             />
