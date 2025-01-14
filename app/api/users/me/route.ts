@@ -45,6 +45,9 @@ export async function GET() {
       name: user.name,
       avatar_url: user.avatar_url,
       status: user.status,
+      bio: user.bio,
+      status_message: user.status_message,
+      status_emoji: user.status_emoji,
       last_seen_at: user.last_seen_at,
       created_at: user.created_at,
       updated_at: user.updated_at

@@ -83,3 +83,6 @@ build/
 *.pem
 .vercel
 .env*.local
+.backup/
+.jest/
+__tests__/

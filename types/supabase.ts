@@ -19,6 +19,9 @@ export interface Database {
           role: 'ADMIN' | 'USER'
           created_at: string
           updated_at: string
+          bio: string | null
+          status_message: string | null
+          status_emoji: string | null
         }
         Insert: Omit<Database['public']['Tables']['users']['Row'], 'created_at' | 'updated_at'>
         Update: Partial<Database['public']['Tables']['users']['Insert']>

@@ -30,26 +30,95 @@ export function ChatWindow({
   const [isTransitioning, setIsTransitioning] = useState(false);
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
+  const [hasMoreMessages, setHasMoreMessages] = useState(true);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { userId, user } = useSupabaseAuth();
+  const isInitialLoadRef = useRef(true);
 
+  // Handle scrolling behavior
+  useEffect(() => {
+    if (!messages.length) return;
+
+    if (isInitialLoadRef.current && !isLoading) {
+      // Initial load: instant scroll
+      messagesEndRef.current?.scrollIntoView();
+      isInitialLoadRef.current = false;
+    } else if (!isLoading) {
+      // New messages: smooth scroll
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading]);
+
+  const loadMoreMessages = async () => {
+    if (isLoadingMore || !hasMoreMessages) return;
+    
+    try {
+      setIsLoadingMore(true);
+      const oldestMessageId = messages[0]?.id;
+      const oldestTimestamp = messages[0]?.created_at;
+      const response = await fetch(`/api/channels/${channelId}/messages?before=${oldestTimestamp}`);
+      if (!response.ok) {
+        throw new Error('Failed to fetch more messages');
+      }
+      const olderMessages = await response.json();
+      
+      if (olderMessages.length === 0) {
+        setHasMoreMessages(false);
+        return;
+      }
+
+      // Transform messages like in the original fetch
+      const transformedMessages = olderMessages.map((msg: any) => ({
+        id: msg.id,
+        content: msg.content,
+        channel_id: msg.channel_id,
+        user_id: msg.user_id,
+        created_at: msg.created_at,
+        updated_at: msg.updated_at,
+        user: {
+          id: msg.user.id,
+          name: msg.user.name,
+          avatar_url: msg.user.avatar_url,
+          role: msg.user.role
+        },
+        reactions: (msg.reactions || []).reduce((acc: any, reaction: any) => {
+          if (!acc[reaction.emoji]) {
+            acc[reaction.emoji] = {
+              emoji: reaction.emoji,
+              userIds: [],
+              users: []
+            };
+          }
+          acc[reaction.emoji].userIds.push(reaction.user_id);
+          if (reaction.user) {
+            acc[reaction.emoji].users.push({ name: reaction.user.name });
+          }
+          return acc;
+        }, {}),
+        replies: {
+          count: msg.replies?.count || 0
+        }
+      }));
+
+      setMessages(prev => [...transformedMessages, ...prev]);
+    } catch (error) {
+      console.error('Error loading more messages:', error);
+    } finally {
+      setIsLoadingMore(false);
+    }
+  };
+
+  // Separate effect for handling loading state transitions
   useEffect(() => {
     if (isLoading) {
       setIsTransitioning(false);
     } else {
       setIsTransitioning(true);
-      const timer = setTimeout(() => setIsTransitioning(false), 500); // Match fade-out duration
+      const timer = setTimeout(() => setIsTransitioning(false), 500);
       return () => clearTimeout(timer);
     }
   }, [isLoading]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
 
   const handleSelectMessage = (message: Message) => {
     const latestMessage = messages.find(m => m.id === message.id);
@@ -440,6 +509,18 @@ export function ChatWindow({
   return (
     <div className="flex flex-col h-full bg-[#F5E6D3]">
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {hasMoreMessages && (
+          <div className="flex justify-center mb-4">
+            <Button
+              onClick={loadMoreMessages}
+              disabled={isLoadingMore}
+              variant="outline"
+              className="bg-white/75"
+            >
+              {isLoadingMore ? 'Loading...' : 'Load More'}
+            </Button>
+          </div>
+        )}
         {messages.map((message) => {
           const isCurrentUser = message.user_id === userId;
           console.log('Message replies:', {

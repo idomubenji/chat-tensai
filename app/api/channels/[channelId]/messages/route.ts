@@ -29,7 +29,7 @@ export async function GET(
 
     // Get URL parameters
     const { searchParams } = new URL(req.url);
-    const cursor = searchParams.get('cursor');
+    const before = searchParams.get('before');
     const limit = parseInt(searchParams.get('limit') || '50');
 
     // Get messages with pagination
@@ -47,24 +47,24 @@ export async function GET(
       `)
       .eq('channel_id', params.channelId)
       .is('parent_id', null)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
       .limit(limit);
 
-    if (cursor) {
-      query.gt('created_at', cursor);
+    if (before) {
+      query.lt('created_at', before);
     }
 
     const { data: messages, error: messagesError } = await query;
 
     if (messagesError) throw messagesError;
 
-    // Transform messages to include reply count
+    // Transform messages to include reply count and reverse to show oldest first
     const transformedMessages = messages?.map(message => ({
       ...message,
       replies: {
         count: Array.isArray(message.replies) ? message.replies.length : 0
       }
-    }));
+    })).reverse();
 
     // Debug logging
     console.log('Messages query result:', {
