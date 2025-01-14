@@ -591,7 +591,7 @@ export function ChatWindow({
     <div className="flex flex-col h-full bg-[#F5E6D3]">
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto p-4 space-y-4"
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
       >
         {hasMoreMessages && (
           <div className="flex justify-center mb-4">

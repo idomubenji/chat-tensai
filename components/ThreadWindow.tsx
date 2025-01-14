@@ -587,7 +587,7 @@ export function ThreadWindow({
         </Button>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
         {parentMessage && renderMessage(parentMessage, true)}
         {replies.map(reply => renderMessage(reply))}
       </div>
