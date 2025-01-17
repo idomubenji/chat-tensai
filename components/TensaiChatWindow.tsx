@@ -157,7 +157,7 @@ export function TensaiChatWindow() {
       const aiMessage: TensaiMessage = {
         id: `ai-${Date.now()}`,
         content: response.response,
-        username: newMentionedUser ? response.metadata.username : 'TENSAI BOT',
+        username: newMentionedUser ? `FAKE ${response.metadata.username}` : 'TENSAI BOT',
         userId: 'ai',
         avatarUrl: response.metadata.avatarUrl,
         isAi: true,
