@@ -80,17 +80,28 @@ export function TensaiChatWindow() {
   useEffect(() => {
     if (!messages.length) return;
 
-    if (isInitialLoadRef.current && !isLoading) {
-      // Initial load: instant scroll to bottom
-      messagesEndRef.current?.scrollIntoView();
-      isInitialLoadRef.current = false;
-    } else if (!isLoading) {
-      // Only scroll for own messages or if near bottom
-      const lastMessage = messages[messages.length - 1];
-      if (lastMessage.userId === userId || isNearBottomRef.current) {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    requestAnimationFrame(() => {
+      const scrollToBottom = () => {
+        if (messagesEndRef.current) {
+          messagesEndRef.current.scrollIntoView({ 
+            behavior: isInitialLoadRef.current ? 'auto' : 'smooth',
+            block: 'end'
+          });
+        }
+      };
+
+      if (isInitialLoadRef.current && !isLoading) {
+        // Initial load: instant scroll to bottom
+        scrollToBottom();
+        isInitialLoadRef.current = false;
+      } else if (!isLoading) {
+        // Only scroll for own messages or if near bottom
+        const lastMessage = messages[messages.length - 1];
+        if (lastMessage.userId === userId || isNearBottomRef.current) {
+          scrollToBottom();
+        }
       }
-    }
+    });
   }, [messages, isLoading, userId]);
 
   // Extract mentioned username from message
@@ -113,15 +124,15 @@ export function TensaiChatWindow() {
       timestamp: new Date().toISOString()
     };
 
-    // Add optimistic message
-    setMessages(prev => {
-      const newMessages = [...prev, userMessage];
-      return newMessages.sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-      );
-    });
+    // Add optimistic message and scroll to bottom
+    setMessages(prev => [...prev, userMessage]);
     setInputText('');
     setIsLoading(true);
+
+    // Force scroll to bottom after adding user message
+    requestAnimationFrame(() => {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    });
 
     try {
       const mentionedUser = extractMentionedUser(inputText);
@@ -137,11 +148,11 @@ export function TensaiChatWindow() {
         timestamp: new Date().toISOString()
       };
 
-      setMessages(prev => {
-        const newMessages = [...prev, aiMessage];
-        return newMessages.sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
+      setMessages(prev => [...prev, aiMessage]);
+      
+      // Force scroll to bottom after AI response
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       });
     } catch (error) {
       console.error('Failed to get AI response:', error);
@@ -155,6 +166,11 @@ export function TensaiChatWindow() {
         timestamp: new Date().toISOString()
       };
       setMessages(prev => [...prev, errorMessage]);
+      
+      // Force scroll to bottom after error message
+      requestAnimationFrame(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
     } finally {
       setIsLoading(false);
     }
