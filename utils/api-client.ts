@@ -1,9 +1,14 @@
 import { config } from '../config/api';
 
 interface ChatResponse {
-  content: string;
-  username: string;
-  avatarUrl: string;
+  metadata: {
+    userId: string;
+    username: string;
+    avatarUrl: string;
+    messageCount: number;
+    executionTime: number;
+  };
+  response: string;
 }
 
 interface ChatRequest {

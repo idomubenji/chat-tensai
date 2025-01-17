@@ -146,12 +146,20 @@ export function TensaiChatWindow() {
       setCurrentMentionedUser(newMentionedUser); // Update the current target
       const response = await tensaiClient.sendMessage(inputText, newMentionedUser);
 
+      // Debug log to see API response
+      console.log('API Response:', {
+        content: response.content,
+        username: response.username,
+        avatarUrl: response.avatarUrl,
+        fullResponse: response
+      });
+
       const aiMessage: TensaiMessage = {
         id: `ai-${Date.now()}`,
-        content: response.content,
-        username: `${response.username}`,
+        content: response.response,
+        username: response.metadata.username,
         userId: 'ai',
-        avatarUrl: response.avatarUrl,
+        avatarUrl: response.metadata.avatarUrl,
         isAi: true,
         timestamp: new Date().toISOString()
       };
