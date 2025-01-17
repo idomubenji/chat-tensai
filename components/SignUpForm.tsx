@@ -54,14 +54,6 @@ export function SignUpForm() {
           <br />
           If you don&apos;t see the email, check your spam folder.
         </div>
-        <Button
-          type="button"
-          variant="outline"
-          className="mt-4"
-          onClick={() => window.location.href = 'https://mail.google.com'}
-        >
-          Open Gmail
-        </Button>
       </div>
     );
   }

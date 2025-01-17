@@ -16,6 +16,7 @@ import { ProfilePicture } from '@/components/ProfilePicture';
 import { SignOutButton } from '@/components/SignOutButton';
 import Image from 'next/image';
 import useSWR from 'swr';
+import { TensaiButton } from '@/components/TensaiButton';
 
 // Fetch function that SWR will use
 const fetcher = async (url: string) => {
@@ -87,6 +88,7 @@ export function Sidebar() {
             avatarUrl={userData?.avatar_url || null}
           />
         </button>
+        <TensaiButton />
         <SignOutButton />
       </div>
     </div>

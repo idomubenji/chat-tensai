@@ -9,16 +9,26 @@ import type { Database } from '@/types/supabase';
 export async function getAuthUserId(): Promise<string | null> {
   try {
     const supabase = createRouteHandlerClient<Database>({ cookies });
+    console.log('[getAuthUserId] Created Supabase client');
+
     const { data: { session }, error } = await supabase.auth.getSession();
+    console.log('[getAuthUserId] Session check:', {
+      hasSession: !!session,
+      hasUser: !!session?.user,
+      userId: session?.user?.id,
+      hasAccessToken: !!session?.access_token,
+      hasRefreshToken: !!session?.refresh_token,
+      error: error ? { message: error.message } : null
+    });
 
     if (error || !session) {
-      console.error('Error getting session:', error);
+      console.error('[getAuthUserId] Error or no session:', error);
       return null;
     }
 
     return session.user.id;
   } catch (error) {
-    console.error('Error in getAuthUserId:', error);
+    console.error('[getAuthUserId] Unhandled error:', error);
     return null;
   }
 }

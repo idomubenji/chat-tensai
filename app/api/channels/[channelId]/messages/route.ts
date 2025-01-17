@@ -8,21 +8,36 @@ export async function GET(
   { params }: { params: { channelId: string } }
 ) {
   try {
+    console.log('GET /api/channels/[channelId]/messages - Start', {
+      channelId: params.channelId
+    });
+
     const userId = await getAuthUserId();
+    console.log('Auth check:', { userId });
+    
     if (!userId) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
     const supabase = createSupabaseAdminClient();
+    console.log('Created Supabase client');
 
     // First check if the channel exists
     const channel = await checkChannelExists(params.channelId);
+    console.log('Channel check:', { exists: !!channel, channelId: params.channelId });
+    
     if (!channel) {
       return new NextResponse('Channel not found', { status: 404 });
     }
 
     // Then check if user is a member of the channel
     const membership = await checkChannelMembership(params.channelId, userId);
+    console.log('Membership check:', { 
+      hasMembership: !!membership, 
+      channelId: params.channelId,
+      userId 
+    });
+    
     if (!membership) {
       return new NextResponse('Not a member of this channel', { status: 403 });
     }
@@ -71,7 +86,13 @@ export async function GET(
       }
     }
 
+    console.log('Executing query for messages');
     const { data: messages, error: messagesError } = await query;
+    console.log('Query result:', { 
+      success: !messagesError,
+      messageCount: messages?.length || 0,
+      error: messagesError ? messagesError.message : null
+    });
 
     if (messagesError) {
       console.error('Error fetching messages:', messagesError);

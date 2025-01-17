@@ -96,7 +96,12 @@ export function ChatWindow({
       const oldScrollTop = container?.scrollTop || 0;
 
       const response = await fetch(
-        `/api/channels/${channelId}/messages?before=${encodeURIComponent(oldestMessage.created_at)}&limit=50`
+        `/api/channels/${channelId}/messages?before=${encodeURIComponent(oldestMessage.created_at)}&limit=50`,
+        {
+          headers: {
+            'x-api-key': process.env.NEXT_PUBLIC_TENSAI_KEY || ''
+          }
+        }
       );
       
       if (!response.ok) {
@@ -233,6 +238,7 @@ export function ChatWindow({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': process.env.NEXT_PUBLIC_TENSAI_KEY || ''
         },
         body: JSON.stringify({ content: newMessage }),
       });
@@ -295,6 +301,7 @@ export function ChatWindow({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-api-key': process.env.NEXT_PUBLIC_TENSAI_KEY || ''
         },
         body: JSON.stringify({ 
           emoji,
@@ -434,7 +441,11 @@ export function ChatWindow({
       try {
         setIsLoading(true);
         setHasMoreMessages(true); // Reset on channel change
-        const response = await fetch(`/api/channels/${channelId}/messages`);
+        const response = await fetch(`/api/channels/${channelId}/messages`, {
+          headers: {
+            'x-api-key': process.env.NEXT_PUBLIC_TENSAI_KEY || ''
+          }
+        });
         if (!response.ok) {
           throw new Error('Failed to fetch messages');
         }

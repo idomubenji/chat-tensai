@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --experimental-https",
+    "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "start:prod": "NODE_ENV=production node scripts/server.js",
@@ -29,7 +29,9 @@
     "create-system-users": "ts-node scripts/create-system-users.ts",
     "env:check": "ts-node scripts/check-env.ts",
     "test:components": "ts-node scripts/test-components.ts",
-    "test:components:prod": "NODE_ENV=production ts-node scripts/test-components.ts"
+    "test:components:prod": "NODE_ENV=production ts-node scripts/test-components.ts",
+    "test-cors": "ts-node scripts/test-cors.ts",
+    "create-test-user": "ts-node scripts/create-test-user.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.723.0",
@@ -55,6 +57,7 @@
     "@supabase/ssr": "^0.5.2",
     "@supabase/supabase-js": "^2.47.12",
     "@types/pg": "^8.11.10",
+    "chalk": "^4.1.2",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cookie": "^0.7.0",

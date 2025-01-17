@@ -14,12 +14,20 @@ export default function Home() {
   const router = useRouter();
   const [isCheckingChannels, setIsCheckingChannels] = useState(true);
 
+  // Debug logging
+  useEffect(() => {
+    console.log('Auth state:', { isLoaded, userId });
+  }, [isLoaded, userId]);
+
+  // Handle auth redirect
   useEffect(() => {
     if (isLoaded && !userId) {
+      console.log('No user found, redirecting to sign-in');
       router.replace('/sign-in');
     }
   }, [isLoaded, userId, router]);
 
+  // Check channel access
   useEffect(() => {
     let isMounted = true;
 
@@ -30,6 +38,8 @@ export default function Home() {
         }
         return;
       }
+
+      console.log('Checking channel access for user:', userId);
 
       try {
         const supabase = createClientComponentClient<Database>();
@@ -47,8 +57,11 @@ export default function Home() {
         }
 
         if (isMounted) {
+          console.log('Channel check result:', { channels });
+          
           // If user has no access to any channels, redirect to sign-in
           if (!channels || channels.length === 0) {
+            console.log('No channels found, redirecting to sign-in');
             router.replace('/sign-in');
           }
           setIsCheckingChannels(false);
@@ -70,6 +83,7 @@ export default function Home() {
 
   // Show loading state while checking auth and channels
   if (!isLoaded || isCheckingChannels) {
+    console.log('Still loading:', { isLoaded, isCheckingChannels });
     return (
       <div className="h-full w-full flex items-center justify-center">
         <LoadingBall />
@@ -79,6 +93,7 @@ export default function Home() {
 
   // Don't render anything while redirecting to sign-in
   if (!userId) {
+    console.log('No userId, returning null');
     return null;
   }
 

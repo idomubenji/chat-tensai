@@ -23,7 +23,7 @@ const nextConfig = {
 
   // Add security headers
   async headers() {
-    return [
+    const headers = [
       {
         // Apply these headers to all routes
         source: '/:path*',
@@ -43,11 +43,6 @@ const nextConfig = {
             key: 'X-Content-Type-Options',
             value: 'nosniff'
           },
-          // Strict transport security (force HTTPS)
-          {
-            key: 'Strict-Transport-Security',
-            value: 'max-age=31536000; includeSubDomains'
-          },
           // Referrer policy
           {
             key: 'Referrer-Policy',
@@ -56,6 +51,16 @@ const nextConfig = {
         ]
       }
     ];
+
+    // Only add HSTS in production
+    if (process.env.NODE_ENV === 'production') {
+      headers[0].headers.push({
+        key: 'Strict-Transport-Security',
+        value: 'max-age=31536000; includeSubDomains'
+      });
+    }
+
+    return headers;
   }
 };
 
