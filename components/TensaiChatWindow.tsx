@@ -28,6 +28,7 @@ export function TensaiChatWindow() {
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [userData, setUserData] = useState<{ name: string; avatar_url: string | null } | null>(null);
+  const [currentMentionedUser, setCurrentMentionedUser] = useState<string | undefined>(undefined);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const messagesContainerRef = useRef<HTMLDivElement>(null);
   const { user, userId } = useSupabaseAuth();
@@ -104,10 +105,16 @@ export function TensaiChatWindow() {
     });
   }, [messages, isLoading, userId]);
 
-  // Extract mentioned username from message
+  // Extract mentioned username from message and handle @AI reset
   const extractMentionedUser = (message: string): string | undefined => {
     const match = message.match(/@(\w+)/);
-    return match ? match[1] : undefined;
+    if (!match) return currentMentionedUser; // Keep current target if no new mention
+
+    const mentionedUser = match[1];
+    if (mentionedUser.toLowerCase() === 'ai') {
+      return undefined; // Reset to AI
+    }
+    return mentionedUser;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -135,8 +142,9 @@ export function TensaiChatWindow() {
     });
 
     try {
-      const mentionedUser = extractMentionedUser(inputText);
-      const response = await tensaiClient.sendMessage(inputText, mentionedUser);
+      const newMentionedUser = extractMentionedUser(inputText);
+      setCurrentMentionedUser(newMentionedUser); // Update the current target
+      const response = await tensaiClient.sendMessage(inputText, newMentionedUser);
 
       const aiMessage: TensaiMessage = {
         id: `ai-${Date.now()}`,

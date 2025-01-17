@@ -32,7 +32,7 @@ export function Sidebar() {
   const router = useRouter();
 
   // Fetch user data from the database
-  const { data: userData } = useSWR('/api/users/me', fetcher);
+  const { data: userData, isLoading: isUserLoading } = useSWR('/api/users/me', fetcher);
 
   if (!user) return null;
 
@@ -80,12 +80,13 @@ export function Sidebar() {
         <button
           onClick={handleProfileClick}
           className="hover:opacity-80 transition-opacity"
+          disabled={isUserLoading}
         >
           <ProfilePicture 
             borderColor="black"
             borderWidth="thin"
             size="default"
-            avatarUrl={userData?.avatar_url || null}
+            avatarUrl={isUserLoading ? null : userData?.avatar_url || null}
           />
         </button>
         <TensaiButton />
