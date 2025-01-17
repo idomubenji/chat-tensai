@@ -148,30 +148,33 @@ export async function middleware(req: NextRequest) {
 
     // Protect API routes
     if (req.nextUrl.pathname.startsWith('/api/')) {
-      // Check API key first
-      const apiKey = req.headers.get('x-api-key');
-      console.log('[Middleware] API key validation:', {
-        hasApiKey: !!apiKey,
-        isValid: apiKey === process.env.NEXT_PUBLIC_TENSAI_KEY,
-        expectedKey: process.env.NEXT_PUBLIC_TENSAI_KEY ? '[PRESENT]' : '[MISSING]',
-        receivedKey: apiKey ? '[PRESENT]' : '[MISSING]',
-        // Add debug info for comparison
-        debug: {
-          receivedKeyLength: apiKey?.length,
-          expectedKeyLength: process.env.NEXT_PUBLIC_TENSAI_KEY?.length,
-          receivedKeyPrefix: apiKey?.slice(0, 10),
-          expectedKeyPrefix: process.env.NEXT_PUBLIC_TENSAI_KEY?.slice(0, 10)
-        }
-      });
+      // Skip API key check for avatar upload endpoint
+      if (!req.nextUrl.pathname.startsWith('/api/users/me/avatar')) {
+        // Check API key first
+        const apiKey = req.headers.get('x-api-key');
+        console.log('[Middleware] API key validation:', {
+          hasApiKey: !!apiKey,
+          isValid: apiKey === process.env.NEXT_PUBLIC_TENSAI_KEY,
+          expectedKey: process.env.NEXT_PUBLIC_TENSAI_KEY ? '[PRESENT]' : '[MISSING]',
+          receivedKey: apiKey ? '[PRESENT]' : '[MISSING]',
+          // Add debug info for comparison
+          debug: {
+            receivedKeyLength: apiKey?.length,
+            expectedKeyLength: process.env.NEXT_PUBLIC_TENSAI_KEY?.length,
+            receivedKeyPrefix: apiKey?.slice(0, 10),
+            expectedKeyPrefix: process.env.NEXT_PUBLIC_TENSAI_KEY?.slice(0, 10)
+          }
+        });
 
-      if (!apiKey || apiKey !== process.env.NEXT_PUBLIC_TENSAI_KEY) {
-        console.log('[Middleware] Invalid or missing API key');
-        const errorResponse = NextResponse.json(
-          { error: 'Unauthorized - Invalid or missing API key' },
-          { status: 401 }
-        );
-        setCorsHeaders(req, errorResponse);
-        return errorResponse;
+        if (!apiKey || apiKey !== process.env.NEXT_PUBLIC_TENSAI_KEY) {
+          console.log('[Middleware] Invalid or missing API key');
+          const errorResponse = NextResponse.json(
+            { error: 'Unauthorized - Invalid or missing API key' },
+            { status: 401 }
+          );
+          setCorsHeaders(req, errorResponse);
+          return errorResponse;
+        }
       }
 
       if (!session) {

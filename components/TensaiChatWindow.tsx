@@ -234,10 +234,12 @@ export function TensaiChatWindow() {
                   <div className="w-8 h-8 flex-shrink-0">
                     <ProfilePicture
                       size="default"
-                      borderColor={isCurrentUser ? 'black' : 'white'}
-                      borderWidth="thin"
+                      borderColor={isCurrentUser ? 'black' : 'black'}
+                      borderWidth={isCurrentUser ? 'thin' : 'thick'}
                       avatarUrl={message.avatarUrl}
-                      className={message.isAi ? 'rounded-none' : 'rounded-full'}
+                      className={cn(
+                        !isCurrentUser && '[&_img]:!rounded-none [&_div]:!rounded-none [&_div]:!border-[6px]'
+                      )}
                     />
                   </div>
                   <div

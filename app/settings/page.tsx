@@ -18,6 +18,26 @@ import { Toaster } from '@/components/ui/toaster';
 import { mutate } from 'swr';
 import { USER_DATA_KEY } from '@/components/PersonalCard';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import useSWR from 'swr';
+import { Skeleton } from '@/components/ui/skeleton';
+
+// Fetch function that uses Supabase client directly
+const fetcher = async () => {
+  const supabase = createClientComponentClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  
+  if (!user) throw new Error('Not authenticated');
+  
+  const { data, error } = await supabase
+    .from('users')
+    .select('*')
+    .eq('id', user.id)
+    .single();
+    
+  if (error) throw error;
+  console.log('Fetched user data:', data);
+  return data;
+};
 
 interface UserSettings {
   bio: string;
@@ -31,6 +51,15 @@ export default function SettingsPage() {
   const { user, isLoaded } = useSupabaseAuth();
   const router = useRouter();
   const { toast } = useToast();
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+
+  // Use SWR to fetch user data only when session is loaded
+  const { data: userData, mutate, isLoading } = useSWR(
+    isLoaded && user ? USER_DATA_KEY : null,
+    fetcher
+  );
+
   const [settings, setSettings] = useState<UserSettings>({
     bio: '',
     status_message: '',
@@ -38,86 +67,78 @@ export default function SettingsPage() {
     avatar_url: null,
     username: '',
   });
-  const [isSaving, setIsSaving] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+
+  console.log('Settings page render:', {
+    isLoaded,
+    hasUser: !!user,
+    userId: user?.id,
+    userData,
+    isLoading,
+    settings,
+    fetchUrl: isLoaded && user ? USER_DATA_KEY : null
+  });
+
+  // Update settings when userData changes
+  useEffect(() => {
+    if (userData) {
+      console.log('Settings userData update:', userData);
+      setSettings({
+        bio: userData.bio || '',
+        status_message: userData.status_message || '',
+        status_emoji: userData.status_emoji || '',
+        avatar_url: userData.avatar_url,
+        username: userData.name || user?.user_metadata?.username || '',
+      });
+    }
+  }, [userData, user]);
 
   useEffect(() => {
     if (isLoaded && !user) {
       router.push('/sign-in');
-      return;
     }
-
-    // Fetch user settings
-    const fetchSettings = async () => {
-      try {
-        const response = await fetch('/api/users/me');
-        if (!response.ok) throw new Error('Failed to fetch user settings');
-        const data = await response.json();
-        setSettings({
-          bio: data.bio || '',
-          status_message: data.status_message || '',
-          status_emoji: data.status_emoji || '',
-          avatar_url: data.avatar_url,
-          username: data.name || user?.user_metadata?.username || '',
-        });
-      } catch (error) {
-        console.error('Error fetching user settings:', error);
-        toast({
-          variant: 'destructive',
-          title: 'Error',
-          description: 'Failed to load settings. Please try refreshing the page.',
-        });
-      }
-    };
-
-    if (user) {
-      fetchSettings();
-    }
-  }, [isLoaded, user, router, toast]);
+  }, [isLoaded, user, router]);
 
   const handleSave = async () => {
     setIsSaving(true);
     try {
-      const response = await fetch('/api/users/me', {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
+      const supabase = createClientComponentClient();
+      
+      // Optimistically update the UI
+      await mutate(
+        { ...userData, ...settings, name: settings.username },
+        false // Don't revalidate immediately
+      );
+      
+      // Update user profile in database
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
           bio: settings.bio,
           status_message: settings.status_message,
           status_emoji: settings.status_emoji,
           name: settings.username,
           avatar_url: settings.avatar_url,
-        }),
-      });
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user?.id);
 
-      if (!response.ok) {
-        throw new Error('Failed to update user settings');
-      }
-
-      const updatedData = await response.json();
+      if (updateError) throw updateError;
       
       // Update user metadata in Supabase auth
-      const supabase = createClientComponentClient();
       await supabase.auth.updateUser({
         data: { username: settings.username }
       });
       
-      // Update local state with the response data
-      setSettings(prevSettings => ({
-        ...prevSettings,
-        ...updatedData,
-      }));
-      
-      // Trigger revalidation of the user data
-      await mutate(USER_DATA_KEY);
+      // Revalidate the data
+      await mutate();
       
       toast({
         title: 'Settings saved!',
         description: 'Your profile has been updated successfully.',
       });
     } catch (error) {
+      // If there was an error, revalidate to get the correct data
+      await mutate();
       console.error('Error saving settings:', error);
       toast({
         title: 'Error saving settings',
@@ -132,11 +153,18 @@ export default function SettingsPage() {
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
-      const response = await fetch('/api/users/me', {
-        method: 'DELETE',
-      });
+      const supabase = createClientComponentClient();
+      
+      // Delete user's data
+      const { error } = await supabase
+        .from('users')
+        .delete()
+        .eq('id', user?.id);
 
-      if (!response.ok) throw new Error('Failed to delete account');
+      if (error) throw error;
+      
+      // Sign out and redirect
+      await supabase.auth.signOut();
       router.push('/sign-in');
     } catch (error) {
       console.error('Error deleting account:', error);
@@ -156,6 +184,51 @@ export default function SettingsPage() {
 
   if (!user) {
     return null;
+  }
+
+  // Show loading state when data is not yet available
+  if (isLoading || !userData) {
+    return (
+      <div className="flex h-full">
+        <Sidebar />
+        <div className="flex-1 p-6 bg-[#F5E6D3] overflow-y-auto">
+          <div className="max-w-2xl mx-auto space-y-6">
+            <h1 className="text-2xl font-bold mb-6">Settings</h1>
+            
+            <PersonalCard />
+
+            <div className="space-y-6 bg-white p-6 rounded-lg shadow">
+              <div className="flex justify-center">
+                <Skeleton className="h-32 w-32 rounded-full" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="username">Username</Label>
+                <Skeleton className="h-10 w-full" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="bio">Bio</Label>
+                <Skeleton className="h-[100px] w-full" />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="status">Status</Label>
+                <div className="flex gap-2">
+                  <Skeleton className="h-10 flex-1" />
+                  <Skeleton className="h-10 w-10" />
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-4">
+                <Skeleton className="h-10 w-32" />
+                <Skeleton className="h-10 w-32" />
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   return (

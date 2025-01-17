@@ -1,71 +1,48 @@
-import { createSupabaseAdminClient } from '@/lib/supabase';
+import { createRouteHandlerClient } from '@supabase/auth-helpers-nextjs';
+import { cookies } from 'next/headers';
 import { NextResponse } from 'next/server';
 import type { Database } from '@/types/supabase';
-import { getAuthUserId } from '@/lib/auth';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET() {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
-    console.log('[/api/users/me] Session found, fetching user data', {
-      userId
-    });
-    
-    const supabase = createSupabaseAdminClient();
     const { data: user, error } = await supabase
       .from('users')
       .select('*')
-      .eq('id', userId)
+      .eq('id', session.user.id)
       .single();
 
     if (error) {
-      console.error('[/api/users/me] Database error:', {
-        error,
-        userId,
-        message: error.message,
-        code: error.code
-      });
+      console.error('[/api/users/me] Database error:', error);
       return new NextResponse('Error fetching user data', { status: 500 });
     }
 
     if (!user) {
-      console.error('[/api/users/me] User not found in database:', userId);
+      console.error('[/api/users/me] User not found in database:', session.user.id);
       return new NextResponse('User not found', { status: 404 });
     }
 
-    console.log('[/api/users/me] Successfully fetched user data');
-    return NextResponse.json({
-      id: user.id,
-      email: user.email,
-      name: user.name,
-      avatar_url: user.avatar_url,
-      status: user.status,
-      bio: user.bio,
-      status_message: user.status_message,
-      status_emoji: user.status_emoji,
-      last_seen_at: user.last_seen_at,
-      created_at: user.created_at,
-      updated_at: user.updated_at
-    });
+    return NextResponse.json(user);
   } catch (error) {
-    console.error('[/api/users/me] Unhandled error:', {
-      error,
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : undefined
-    });
+    console.error('[/api/users/me] Unhandled error:', error);
     return new NextResponse('Internal Server Error', { status: 500 });
   }
 }
 
 export async function PATCH(req: Request) {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -78,7 +55,6 @@ export async function PATCH(req: Request) {
     }
 
     // Update user profile
-    const supabase = createSupabaseAdminClient();
     const { data: user, error: updateError } = await supabase
       .from('users')
       .update({
@@ -89,7 +65,7 @@ export async function PATCH(req: Request) {
         name,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId)
+      .eq('id', session.user.id)
       .select()
       .single();
 
@@ -107,18 +83,18 @@ export async function PATCH(req: Request) {
 
 export async function DELETE() {
   try {
-    const userId = await getAuthUserId();
-    if (!userId) {
+    const supabase = createRouteHandlerClient<Database>({ cookies });
+    const { data: { session } } = await supabase.auth.getSession();
+
+    if (!session?.user) {
       return new NextResponse('Unauthorized', { status: 401 });
     }
-
-    const supabase = createSupabaseAdminClient();
 
     // First, delete all user's messages
     const { error: messagesError } = await supabase
       .from('messages')
       .delete()
-      .eq('user_id', userId);
+      .eq('user_id', session.user.id);
 
     if (messagesError) throw messagesError;
 
@@ -126,7 +102,7 @@ export async function DELETE() {
     const { error: userError } = await supabase
       .from('users')
       .delete()
-      .eq('id', userId);
+      .eq('id', session.user.id);
 
     if (userError) throw userError;
 

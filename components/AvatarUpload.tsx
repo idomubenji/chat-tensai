@@ -42,10 +42,17 @@ export function AvatarUpload({ onUpload, currentAvatarUrl }: AvatarUploadProps) 
       const response = await fetch('/api/users/me/avatar', {
         method: 'POST',
         body: formData,
+        credentials: 'include'
       });
 
       if (!response.ok) {
-        throw new Error('Failed to upload avatar');
+        const errorText = await response.text();
+        console.error('Avatar upload failed:', {
+          status: response.status,
+          statusText: response.statusText,
+          error: errorText
+        });
+        throw new Error(`Failed to upload avatar: ${errorText}`);
       }
 
       const data = await response.json();
