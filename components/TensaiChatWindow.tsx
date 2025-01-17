@@ -33,6 +33,7 @@ export function TensaiChatWindow() {
   const { user, userId } = useSupabaseAuth();
   const tensaiClient = new TensaiClient();
   const isNearBottomRef = useRef(true);
+  const isInitialLoadRef = useRef(true);
   const supabase = createClientComponentClient<Database>();
 
   // Fetch user data from Supabase
@@ -75,30 +76,22 @@ export function TensaiChatWindow() {
     return position < threshold;
   }, []);
 
-  // Update isNearBottomRef when user scrolls
+  // Handle scrolling behavior
   useEffect(() => {
-    const container = messagesContainerRef.current;
-    if (!container) return;
+    if (!messages.length) return;
 
-    const handleScroll = () => {
-      isNearBottomRef.current = checkIfNearBottom();
-    };
-
-    container.addEventListener('scroll', handleScroll);
-    return () => container.removeEventListener('scroll', handleScroll);
-  }, [checkIfNearBottom]);
-
-  // Scroll to bottom for new messages if near bottom
-  useEffect(() => {
-    if (messages.length && isNearBottomRef.current) {
-      const scrollIntoViewIfNeeded = () => {
-        if (messagesEndRef.current && typeof messagesEndRef.current.scrollIntoView === 'function') {
-          messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
-        }
-      };
-      scrollIntoViewIfNeeded();
+    if (isInitialLoadRef.current && !isLoading) {
+      // Initial load: instant scroll to bottom
+      messagesEndRef.current?.scrollIntoView();
+      isInitialLoadRef.current = false;
+    } else if (!isLoading) {
+      // Only scroll for own messages or if near bottom
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.userId === userId || isNearBottomRef.current) {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }
     }
-  }, [messages]);
+  }, [messages, isLoading, userId]);
 
   // Extract mentioned username from message
   const extractMentionedUser = (message: string): string | undefined => {
@@ -168,10 +161,13 @@ export function TensaiChatWindow() {
   };
 
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900">
+    <div className="flex flex-col h-[calc(100vh-4rem)] bg-gradient-to-br from-purple-900 via-indigo-900 to-blue-900">
       <div 
         ref={messagesContainerRef}
-        className="flex-1 overflow-y-auto px-6 py-4 space-y-4"
+        className="flex-1 overflow-y-auto px-6 py-4 space-y-4 min-h-0"
+        onScroll={() => {
+          isNearBottomRef.current = checkIfNearBottom();
+        }}
       >
         {messages.map((message) => {
           const isCurrentUser = message.userId === userId;
@@ -251,7 +247,7 @@ export function TensaiChatWindow() {
         <div ref={messagesEndRef} />
       </div>
 
-      <form onSubmit={handleSubmit} className="p-4 bg-black/20">
+      <form onSubmit={handleSubmit} className="sticky bottom-0 p-4 bg-black/20">
         <div className="flex gap-2">
           <Input
             type="text"
