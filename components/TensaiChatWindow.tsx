@@ -112,7 +112,7 @@ export function TensaiChatWindow() {
 
     const mentionedUser = match[1];
     if (mentionedUser.toLowerCase() === 'ai') {
-      return undefined; // Reset to AI
+      return undefined; // Reset to TENSAI BOT
     }
     return mentionedUser;
   };
@@ -148,16 +148,16 @@ export function TensaiChatWindow() {
 
       // Debug log to see API response
       console.log('API Response:', {
-        content: response.content,
-        username: response.username,
-        avatarUrl: response.avatarUrl,
+        content: response.response,
+        username: response.metadata.username,
+        avatarUrl: response.metadata.avatarUrl,
         fullResponse: response
       });
 
       const aiMessage: TensaiMessage = {
         id: `ai-${Date.now()}`,
         content: response.response,
-        username: response.metadata.username,
+        username: currentMentionedUser ? response.metadata.username : 'TENSAI BOT',
         userId: 'ai',
         avatarUrl: response.metadata.avatarUrl,
         isAi: true,
