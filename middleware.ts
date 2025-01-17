@@ -148,8 +148,9 @@ export async function middleware(req: NextRequest) {
 
     // Protect API routes
     if (req.nextUrl.pathname.startsWith('/api/')) {
-      // Skip API key check for avatar upload endpoint
-      if (!req.nextUrl.pathname.startsWith('/api/users/me/avatar')) {
+      // Skip API key check for avatar upload endpoint and user profile endpoint
+      if (!req.nextUrl.pathname.startsWith('/api/users/me/avatar') && 
+          !req.nextUrl.pathname.startsWith('/api/users/me')) {
         // Check API key first
         const apiKey = req.headers.get('x-api-key');
         console.log('[Middleware] API key validation:', {
